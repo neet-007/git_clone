@@ -37,7 +37,17 @@ GitRepository *new_git_repository(const char *path, bool force){
 
     char *cf = repo_file(repo, false, 1, "config");
     if (PATH_EXISTS(cf)){
-        //parse cf
+        repo->config = ini_parse(cf);
+        if (repo->config == NULL){
+            fprintf(stderr, "could not parse configuration file\n");
+            free(repo);
+            free(worktree);
+            free(gitdir);
+            if (cf != NULL){
+                free(cf);
+            }
+            return NULL;
+        }
     }else if (!force){
         fprintf(stderr, "configuration file is missing\n");
         free(repo);
@@ -50,8 +60,29 @@ GitRepository *new_git_repository(const char *path, bool force){
     }
 
     if (!force){
-        /*
-        int vers = core section, repositoryformatversion key
+        Ht_item *ret = ini_get_key(repo->config, "core", "repositoryformatversion");
+        if (ret == NULL){
+            fprintf(stderr, "could not find repositoryformationversion\n");
+            free(repo);
+            free(worktree);
+            free(gitdir);
+            if (cf != NULL){
+                free(cf);
+            }
+            return NULL;
+        }
+        if (ret->value_type != TYPE_INT){
+            fprintf(stderr, "repositoryformationversion value must be int\n");
+            free(repo);
+            free(worktree);
+            free(gitdir);
+            if (cf != NULL){
+                free(cf);
+            }
+            return NULL;
+        }
+
+        int vers = (* (int *)ret->value);
         if (vers != 0){
             fprintf(stderr, "unsupported repositoryformationversion: %d\n", vers);
             free(repo);
@@ -62,7 +93,6 @@ GitRepository *new_git_repository(const char *path, bool force){
             }
             return NULL;
         }
-        */
     }
 
     return repo;
@@ -215,7 +245,7 @@ GitRepository *repo_create(char *path){
     fclose(f);
 
     filename = repo_file(repo, false, 1, "config");
-    f = fopen(filename, "wb");
+    f = fopen(filename, "ab");
     if (f == NULL){
         fprintf(stderr, "unable to open file %s", filename);
         free_repo(repo);
@@ -224,10 +254,23 @@ GitRepository *repo_create(char *path){
     }
 
     data_len = strlen("");
-    fwrite("", sizeof(char), data_len, f);
+    Ini *ini = ini_new(filename);
+    if (ini == NULL){
+        fprintf(stderr, "unable to allocate memory for ini %s", filename);
+        free_repo(repo);
+        free(filename);
+        return NULL;
+    }
+
+    ini_add_section(ini, "core");
+    ini_set_key(ini, "core", "repositoryformatversion", "0");
+    ini_set_key(ini, "core", "filemode", "false");
+    ini_set_key(ini, "core", "bare", "false");
+    ini_write(ini, f);
 
     free(filename);
     fclose(f);
+    free_ini(ini);
 
     return repo;
 }

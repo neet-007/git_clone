@@ -9,11 +9,11 @@ int main(int argc, char *argv[]){
     }
 
     if (strcmp(argv[1], "init") == 0){
-        if (argc > 2){
+        if (argc > 3){
             fprintf(stderr, "can only pass path to init command\n");
             return 1;
         }
-        return cmd_init(argv[1]);
+        return cmd_init(argv[2]);
     }
 
     return 0;

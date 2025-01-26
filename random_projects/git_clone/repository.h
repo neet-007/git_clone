@@ -1,5 +1,5 @@
-#ifndef REPOSITORY_H
-#define REPOSITORY_H
+#ifndef GIT_CLONE_REPOSITORY_H
+#define GIT_CLONE_REPOSITORY_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,10 +8,12 @@
 #include <string.h>
 #include <unistd.h>
 #include "utils.h"
+#include "ini_parser.h"
 
 typedef struct GitRepository{
     char *gitdir;
     char *worktree;
+    Ini *config;
 } GitRepository;
 
 GitRepository *new_git_repository(const char *path, bool force);

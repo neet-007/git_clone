@@ -100,7 +100,7 @@ int make_directories(char *path) {
         }
     }
 
-    return 0;
+    return 1;
 }
 
 bool is_dir(char *path){
@@ -130,4 +130,20 @@ int is_dir_empty(char *path) {
 
     closedir(dir);
     return count == 0;
+}
+
+int count_digits(int num) {
+    if (num == 0){
+        return 1;
+    }
+    int count = 0;
+    if (num < 0){
+        num = -num;
+    }
+
+    while (num != 0) {
+        num /= 10;
+        count++;
+    }
+    return count;
 }

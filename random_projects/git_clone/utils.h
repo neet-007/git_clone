@@ -16,5 +16,6 @@ char *join_path(char *path, unsigned int count, ...);
 int make_directories(char *path);
 bool is_dir(char *path);
 int is_dir_empty(char *path);
+int count_digits(int num);
 
 #endif
