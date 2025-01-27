@@ -576,7 +576,7 @@ Ht_item *ini_get_key(Ini *ini, char *section_name, char *key){
         free(ret);
         return 0;
     }
-    HashTable *section = (HashTable *)ret;
+    HashTable *section = (HashTable *)ret->value;
 
     return ht_search(section, key);
 }

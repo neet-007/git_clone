@@ -59,10 +59,10 @@ GitRepository *new_git_repository(const char *path, bool force){
         }
         return NULL;
     }else{
-        if (cf != NULL){
-            free(cf);
-        }
         repo->config = NULL;
+    }
+    if (cf != NULL){
+        free(cf);
     }
 
     if (!force){
@@ -77,8 +77,9 @@ GitRepository *new_git_repository(const char *path, bool force){
             }
             return NULL;
         }
+        /*
         if (ret->value_type != TYPE_INT){
-            fprintf(stderr, "repositoryformationversion value must be int\n");
+            fprintf(stderr, "repositoryformationversion value must be int %d\n", ret->value_type);
             free(repo);
             free(worktree);
             free(gitdir);
@@ -87,8 +88,10 @@ GitRepository *new_git_repository(const char *path, bool force){
             }
             return NULL;
         }
+        */
 
-        int vers = (* (int *)ret->value);
+        char *vers_str = (char *)ret->value;
+        int vers = atoi(vers_str);
         if (vers != 0){
             fprintf(stderr, "unsupported repositoryformationversion: %d\n", vers);
             free(repo);
@@ -296,4 +299,48 @@ GitRepository *repo_create(char *path){
     free_ini(ini);
 
     return repo;
+}
+
+// path=".", required=true
+GitRepository *repo_find(char *path, bool required){
+    char *real_path = realpath(path, NULL);
+    if (real_path == NULL){
+        fprintf(stderr, "realpath failed for repo_find %s\n", path);
+        return NULL;
+    }
+
+    char *git_dir = join_path(real_path, 1, ".git");
+    if (git_dir == NULL){
+        fprintf(stderr, "joinpath failed for repo_find %s real_path %s\n", path, real_path);
+        free(real_path);
+        return NULL;
+    }
+
+    if (is_dir(git_dir)){
+        GitRepository *repo = new_git_repository(real_path, false);
+        free(git_dir);
+        free(real_path);
+
+        return repo;
+    }
+    free(git_dir);
+
+    char *parent = join_path(real_path, 1, "..");
+    if (parent == NULL){
+        fprintf(stderr, "join_path fialed for repo_find %s\n", path);
+        free(real_path);
+        return NULL;
+    }
+
+    free(real_path);
+    // FIXME: this does not work like this
+    if (strcmp(real_path, parent) == 0){
+        free(parent);
+        if (required){
+            fprintf(stderr, "no git directory\n");
+        }
+        return NULL;
+    }
+
+    return repo_find(parent, required);
 }

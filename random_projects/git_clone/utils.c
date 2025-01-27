@@ -103,10 +103,19 @@ int make_directories(char *path) {
     return 1;
 }
 
-bool is_dir(char *path){
+bool is_dir(char *path) {
     struct stat sb;
+    if (stat(path, &sb) != 0) {
+        fprintf(stderr, "not a dir %s\n", path);
+        perror("stat failed");
+        return false;
+    }
+    return S_ISDIR(sb.st_mode);
+}
 
-    return (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode));
+bool is_file(char *path){
+    struct stat _st;
+    return ((path) != NULL && stat((path), &_st) == 0 && S_ISREG(_st.st_mode));
 }
 
 int is_dir_empty(char *path) {
@@ -146,4 +155,209 @@ int count_digits(int num) {
         count++;
     }
     return count;
+}
+
+char* compress_zlib(char *input, size_t input_len, size_t *output_size) {
+    z_stream strm = {0};
+    deflateInit(&strm, Z_BEST_COMPRESSION);
+
+    size_t max_compressed_size = deflateBound(&strm, input_len);
+
+    char *compressed_data = (char*)malloc(max_compressed_size);
+    if (!compressed_data) {
+        perror("Memory allocation failed");
+        deflateEnd(&strm);
+        return NULL;
+    }
+
+    strm.avail_in = input_len;
+    strm.next_in = (unsigned char *)input;
+    strm.avail_out = max_compressed_size;
+    strm.next_out = (unsigned char *)compressed_data;
+
+    int ret = deflate(&strm, Z_FINISH);
+    if (ret != Z_STREAM_END) {
+        perror("Compression failed");
+        free(compressed_data);
+        deflateEnd(&strm);
+        return NULL;
+    }
+
+    *output_size = max_compressed_size - strm.avail_out;
+
+    deflateEnd(&strm);
+    return compressed_data;
+}
+
+unsigned char *decompress_zlib_from_data(const unsigned char *src, size_t src_len, size_t *dst_len) {
+    z_stream strm = {0};
+    strm.next_in = (unsigned char *)src;
+    strm.avail_in = src_len;
+
+    size_t buffer_size = 1024;
+    unsigned char *dst = malloc(buffer_size);
+    if (!dst) {
+        perror("Failed to allocate memory");
+        return NULL;
+    }
+
+    if (inflateInit(&strm) != Z_OK) {
+        fprintf(stderr, "Failed to initialize decompression\n");
+        free(dst);
+        return NULL;
+    }
+
+    int ret;
+    size_t total_out = 0;
+
+    do {
+        if (strm.total_out >= buffer_size) {
+            buffer_size *= 2;
+            unsigned char *new_dst = realloc(dst, buffer_size);
+            if (!new_dst) {
+                perror("Failed to reallocate memory");
+                inflateEnd(&strm);
+                free(dst);
+                return NULL;
+            }
+            dst = new_dst;
+        }
+
+        strm.next_out = dst + strm.total_out;
+        strm.avail_out = buffer_size - strm.total_out;
+
+        ret = inflate(&strm, Z_NO_FLUSH);
+        if (ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
+            fprintf(stderr, "Decompression failed: %d\n", ret);
+            inflateEnd(&strm);
+            free(dst);
+            return NULL;
+        }
+    } while (ret != Z_STREAM_END);
+
+    total_out = strm.total_out;
+    inflateEnd(&strm);
+
+    unsigned char *final_dst = realloc(dst, total_out);
+    if (!final_dst) {
+        perror("Failed to reallocate memory to final size");
+        free(dst);
+        return NULL;
+    }
+
+    *dst_len = total_out;
+    return final_dst;
+}
+
+unsigned char *decompress_zlib_from_file(FILE *file, size_t *dst_len) {
+    z_stream strm = {0};
+    if (inflateInit(&strm) != Z_OK) {
+        fprintf(stderr, "Failed to initialize decompression\n");
+        return NULL;
+    }
+
+    size_t buffer_size = 1024;
+    unsigned char *dst = malloc(buffer_size);
+    if (!dst) {
+        perror("Failed to allocate memory");
+        inflateEnd(&strm);
+        return NULL;
+    }
+
+    unsigned char in[1024];
+    int ret;
+    size_t total_out = 0;
+
+    do {
+        strm.avail_in = fread(in, 1, sizeof(in), file);
+        if (ferror(file)) {
+            perror("Failed to read file");
+            free(dst);
+            inflateEnd(&strm);
+            return NULL;
+        }
+
+        if (strm.avail_in == 0)
+            break;
+
+        strm.next_in = in;
+
+        do {
+            if (strm.total_out >= buffer_size) {
+                buffer_size *= 2; // Double the buffer size
+                unsigned char *new_dst = realloc(dst, buffer_size);
+                if (!new_dst) {
+                    perror("Failed to reallocate memory");
+                    free(dst);
+                    inflateEnd(&strm);
+                    return NULL;
+                }
+                dst = new_dst;
+            }
+
+            strm.next_out = dst + strm.total_out;
+            strm.avail_out = buffer_size - strm.total_out;
+
+            ret = inflate(&strm, Z_NO_FLUSH);
+            if (ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
+                fprintf(stderr, "Decompression failed: %d\n", ret);
+                free(dst);
+                inflateEnd(&strm);
+                return NULL;
+            }
+        } while (strm.avail_out == 0);
+
+    } while (ret != Z_STREAM_END);
+
+    total_out = strm.total_out;
+    inflateEnd(&strm);
+
+    unsigned char *final_dst = realloc(dst, total_out);
+    if (!final_dst) {
+        perror("Failed to reallocate memory to final size");
+        free(dst);
+        return NULL;
+    }
+
+    *dst_len = total_out;
+    return final_dst;
+}
+
+void print_raw_data_as_chars(char *data, size_t size) {
+    for (size_t i = 0; i < size; i++) {
+            printf("%c", data[i]);
+    }
+}
+
+void sha1_hexdigest(unsigned char *data, size_t len, char *output) {
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    SHA1(data, len, hash);
+
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        sprintf(output + (i * 2), "%02x", hash[i]);
+    }
+    output[SHA_DIGEST_LENGTH * 2] = '\0';
+}
+
+char *file_read_all(FILE *f, size_t *data_size){
+    *data_size = 0;
+
+    while(fgetc(f) != EOF){
+        (*data_size)++;
+    }
+
+    fseek(f, -((long)(*data_size)), SEEK_END);
+
+    char *data = malloc(sizeof(char) * (*data_size));
+    if (data == NULL){
+        fprintf(stderr, "unable to allocate memory for data in file_read_all\n");
+        return NULL;
+    }
+
+    size_t curr = 0;
+    while(curr < *data_size){
+        data[curr++] = fgetc(f);
+    }
+
+    return data;
 }
