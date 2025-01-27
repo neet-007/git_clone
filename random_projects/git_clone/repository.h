@@ -23,5 +23,6 @@ char *repo_dir(GitRepository *repo, bool mkdir, unsigned int count, ...);
 char *repo_dir_variadic(GitRepository *repo, bool mkdir, unsigned int count, va_list va);
 char *repo_path_variadic(GitRepository *repo, unsigned int count, va_list va);
 GitRepository *repo_create(char *path);
+void free_repo(GitRepository *repo);
 
 #endif

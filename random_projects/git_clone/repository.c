@@ -1,6 +1,7 @@
 #include "repository.h"
 #include "utils.h"
 
+// force=false
 GitRepository *new_git_repository(const char *path, bool force){
     GitRepository *repo = malloc(sizeof(GitRepository));
     if (repo == NULL){
@@ -57,6 +58,11 @@ GitRepository *new_git_repository(const char *path, bool force){
             free(cf);
         }
         return NULL;
+    }else{
+        if (cf != NULL){
+            free(cf);
+        }
+        repo->config = NULL;
     }
 
     if (!force){
@@ -101,6 +107,9 @@ GitRepository *new_git_repository(const char *path, bool force){
 void free_repo(GitRepository *repo){
     free(repo->worktree);
     free(repo->gitdir);
+    if (repo->config != NULL){
+        free_ini(repo->config);
+    }
     free(repo);
 }
 
@@ -117,6 +126,7 @@ char *repo_path_variadic(GitRepository *repo, unsigned int count, va_list va){
     return res;
 }
 
+// mkdir=false
 char *repo_file(GitRepository *repo, bool mkdir, unsigned int count, ...){
     va_list va;
     va_start(va, count);
@@ -125,15 +135,21 @@ char *repo_file(GitRepository *repo, bool mkdir, unsigned int count, ...){
 
     if (res != NULL){
         va_start(va, count);
-        res = repo_path_variadic(repo, count, va);   
+        free(res);
+        res = repo_path_variadic(repo, count, va);
         va_end(va);
     }
 
     return res;
 }
 
+// mkdir=false
 char *repo_dir_variadic(GitRepository *repo, bool mkdir, unsigned int count, va_list va){
     char *path = repo_path_variadic(repo, count, va);
+    if (path == NULL){
+        fprintf(stderr, "path is null from repo_path_varadic in repo_dir_variadic\n");
+        return NULL;
+    }
 
     if (PATH_EXISTS(path)){
         if (is_dir(path)){
@@ -154,14 +170,20 @@ char *repo_dir_variadic(GitRepository *repo, bool mkdir, unsigned int count, va_
         return path;
     }
 
+    free(path);
     return NULL;
 }
 
+// mkdir=false
 char *repo_dir(GitRepository *repo, bool mkdir, unsigned int count, ...){
     va_list va;
     va_start(va, count);
     char *path = repo_path_variadic(repo, count, va);
     va_end(va);
+    if (path == NULL){
+        fprintf(stderr, "path is null from repo_path_varadic in repo_dir\n");
+        return NULL;
+    }
 
     if (PATH_EXISTS(path)){
         if (is_dir(path)){
@@ -182,6 +204,7 @@ char *repo_dir(GitRepository *repo, bool mkdir, unsigned int count, ...){
         return path;
     }
 
+    free(path);
     return NULL;
 }
 

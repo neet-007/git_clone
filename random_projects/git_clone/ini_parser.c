@@ -565,6 +565,7 @@ int ini_add_section(Ini *ini, char *section_name){
 
     HashTable *section_table = create_table(CAPACITY);
     ht_insert(ini->sections, section_name, section_table, sizeof(HashTable), TYPE_HASH_TABLE);
+    free(section_table);
     return 1;
 }
 
