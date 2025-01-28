@@ -361,3 +361,13 @@ char *file_read_all(FILE *f, size_t *data_size){
 
     return data;
 }
+
+int find_char(char *raw, char c, int start) {
+    if (!raw || start < 0 || start >= strlen(raw)) {
+        return -1;
+    }
+
+    const char *pos = strchr(raw + start, c);
+
+    return pos ? pos - raw : -1;
+}

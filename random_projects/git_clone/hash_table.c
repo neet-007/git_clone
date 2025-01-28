@@ -114,6 +114,7 @@ Ht_item *create_item(char *key, void *value, size_t value_size, ValueType value_
         free(item);
         exit(EXIT_FAILURE);
     }
+    item->key[0] = '\0';
     strcpy(item->key, key);
 
     item->value = malloc(value_size);
@@ -163,6 +164,10 @@ void free_item(Ht_item *item) {
             free_table((HashTable *)item->value);
             break;
         }
+        case TYPE_ARRAY:{
+            free_dynamic_array((DynamicArray *)item->value);
+            break;
+        }
         default:{
             perror("wrong type for item");
             free(item->key);
@@ -202,6 +207,10 @@ void handle_collision(HashTable *table, unsigned long index, Ht_item *item) {
     table->overflow_buckets[index] = linkedlist_insert(head, item);
 }
 
+/*
+ * copies the key and value.
+ * if value is DynamicArray it will shallow copy.
+*/
 void ht_insert(HashTable *table, char *key, void *value, size_t value_size, ValueType value_type) {
     int index = hash_function(key);
 
@@ -321,20 +330,25 @@ void ht_delete(HashTable *table, char *key) {
 void print_item(Ht_item *item){
     switch (item->value_type) {
         case TYPE_BOOL:{
-            printf("key %s val %d\n", item->key, (*(bool *)item->value));
+            printf("key:%s val:%d\n", item->key, (*(bool *)item->value));
             break;
         }
         case TYPE_INT:{
-            printf("key %s val %d\n", item->key, (*(int *)item->value));
+            printf("key:%s val:%d\n", item->key, (*(int *)item->value));
             break;
         }
         case TYPE_STR:{
-            printf("key item %s val %s\n", item->key, (char *)item->value);
+            printf("key:%s val:%s\n", item->key, (char *)item->value);
             break;
         }
         case TYPE_HASH_TABLE:{
-            printf("key %s val \n", item->key);
+            printf("key %s val:\n", item->key);
             print_table((HashTable *)item->value, 0);
+            break;
+        }
+        case TYPE_ARRAY:{
+            printf("key %s val:\n", item->key);
+            print_dynamic_array((DynamicArray *)item->value);
             break;
         }
         default:{

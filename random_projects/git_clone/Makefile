@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude -w  # Include the directory where exercise.h is located
 LDFLAGS = -lz -lcrypto
 TARGET = git_clone
-SRC_FILES = hash_table.c ini_parser.c repository.c utils.c bridges.c git_object.c main.c
+SRC_FILES = hash_table.c dynamic_array.c ini_parser.c repository.c utils.c bridges.c git_object.c kvlm.c main.c
 
 # Build target
 all: $(TARGET)

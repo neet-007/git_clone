@@ -215,6 +215,33 @@ int index_of_dynamic_array(DynamicArray *array, void *value){
     return idx;
 }
 
+void print_dynamic_array(DynamicArray *array){
+    printf("\nDynamic array\n-------------------\n");
+
+    switch (array->type) {
+        case TYPE_ARRAY_INT:{
+            int *elements = array->elements;
+            for (size_t i = 0; i < array->count; i++){
+                printf("%d, ", elements[i]);
+            }
+            break;
+        }
+        case TYPE_ARRAY_STR:{
+            char **elements = array->elements;
+            for (size_t i = 0; i < array->count; i++){
+                printf("%s, ", elements[i]);
+            }
+            break;
+        }
+        default:{
+            fprintf(stderr, "unkown type for array %d\n", array->type);
+            return;
+        }
+    }
+
+    printf("\n");
+}
+
 int free_dynamic_array(DynamicArray *array){
     switch (array->type) {
         case TYPE_ARRAY_INT:{
@@ -252,8 +279,4 @@ void *reallocate(void *pointer, size_t old_size, size_t new_size){
     }
 
     return pointer;
-}
-
-char *kvlm_serialize(HashTable *kvlm, size_t *data_size){
-    return NULL;
 }

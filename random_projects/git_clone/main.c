@@ -64,6 +64,17 @@ int main(int argc, char *argv[]){
 
         return cmd_hash_object(path, type, write);
     }
+    if (strcmp(argv[1], "log") == 0){
+        if (argc == 2){
+            return cmd_log("HEAD");
+        }
+        if (argc == 3){
+            return cmd_log(argv[2]);
+        }
+
+        fprintf(stderr, "usage:git_clone log COMMIT\n");
+        return 1;
+    }
 
     return 0;
 }

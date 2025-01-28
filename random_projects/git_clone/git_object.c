@@ -1,22 +1,30 @@
 #include "git_object.h"
-#include "utils.h"
-#include <stdio.h>
 
 char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_size){
+    char *ret = NULL;
     switch (object->type) {
         case TYPE_BLOB:{
             GitBlob *blob = object->value;
-            char *ret = malloc(sizeof(char) * (blob->blobdata_size));
+            ret = malloc(sizeof(char) * (blob->blobdata_size));
             if (ret == NULL){
                 fprintf(stderr, "unable to allocate memory for blobdata in git_object_serializer %ld\n", blob->blobdata_size);
                 return NULL;
             }
             *data_size = blob->blobdata_size;
             memcpy(ret, blob->blobdata, sizeof(char) * (blob->blobdata_size));
-            return ret;
+            break;
         }
         case TYPE_COMMIT:{
-
+            GitCommit *commit = object->value;
+            char *temp = kvlm_serialize(commit->kvlm, data_size);
+            if (temp == NULL){
+                fprintf(stderr, "unable to serialize kvlm in git_object_serializer\n");
+                if (ret){
+                    free(ret);
+                    return NULL;
+                }
+            }
+            ret = temp;
             break;
         }
         case TYPE_TAG:{
@@ -27,12 +35,19 @@ char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_
 
             break;
         }
+        default:{
+            fprintf(stderr, "unknown object type %d\n", object->type);
+            if (ret){
+                free(ret);
+            }
+            return NULL;
+        }
     }
 
-    return NULL;
+    return ret;
 }
 
-int git_object_deserialize(GitObject *object, void *data){
+int git_object_deserialize(GitObject *object, void *data, size_t data_size){
     switch (object->type) {
         case TYPE_BLOB:{
             GitBlob *blob = object->value;
@@ -41,7 +56,12 @@ int git_object_deserialize(GitObject *object, void *data){
             break;
         }
         case TYPE_COMMIT:{
-
+            GitCommit *commit = object->value;
+            commit->kvlm = kvlm_parser(data, data_size);
+            if (commit->kvlm == NULL){
+                fprintf(stderr, "unable to prase kvlm in git_object_desirzile\n");
+                return 0;
+            }
             break;
         }
         case TYPE_TAG:{
@@ -85,7 +105,15 @@ GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
             break;
         }
         case TYPE_COMMIT:{
-
+            object->type = TYPE_COMMIT;
+            GitCommit *commit = malloc(sizeof(GitCommit));
+            if (commit == NULL){
+                fprintf(stderr, "unable to allocate memory for commit in new_git_object\n");
+                return NULL;
+            }
+            commit->kvlm = NULL;
+            object->value = commit;
+            git_object_deserialize(object, data, data_size);
             break;
         }
         case TYPE_TAG:{
@@ -344,7 +372,7 @@ void free_git_object(GitObject *object){
     free(object);
 }
 
-// fmt='", follow=true
+// fmt="", follow=true
 char *object_find(GitRepository *repo, char *name, char *fmt, bool follow){
     char *ret = malloc(sizeof(char) * (strlen(name) + 1));
     if (ret == NULL){

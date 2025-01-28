@@ -13,6 +13,7 @@ typedef enum {
     TYPE_INT,
     TYPE_STR,
     TYPE_HASH_TABLE,
+    TYPE_ARRAY,
 } ValueType;
 
 typedef struct Ht_item{

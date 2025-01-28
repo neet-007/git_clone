@@ -32,6 +32,7 @@ int add_dynamic_array(DynamicArray *array, void *value);
 int remove_dynamic_array(DynamicArray *array, size_t idx);
 int remove_dynamic_array_by_value(DynamicArray *array, void *value);
 int index_of_dynamic_array(DynamicArray *array, void *value);
+void print_dynamic_array(DynamicArray *array);
 int free_dynamic_array(DynamicArray *array);
 void *reallocate(void *pointer, size_t old_size, size_t new_size);
 
