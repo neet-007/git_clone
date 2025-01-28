@@ -141,6 +141,7 @@ HashTable *create_table(int size) {
     }
 
     table->overflow_buckets = create_overflow_buckets(table);
+    table->keys = new_dynamic_array(TYPE_ARRAY_STR, 0);
 
     return table;
 }
@@ -183,6 +184,7 @@ void free_table(HashTable *table) {
     }
 
     free_overflow_buckets(table);
+    free_dynamic_array(table->keys);
     free(table->items);
     free(table);
 }
@@ -201,7 +203,6 @@ void handle_collision(HashTable *table, unsigned long index, Ht_item *item) {
 }
 
 void ht_insert(HashTable *table, char *key, void *value, size_t value_size, ValueType value_type) {
-
     int index = hash_function(key);
 
     Ht_item *current_item = table->items[index];
@@ -209,13 +210,14 @@ void ht_insert(HashTable *table, char *key, void *value, size_t value_size, Valu
     if (current_item == NULL) {
         Ht_item *item = create_item(key, value, value_size, value_type);
         if (table->count == table->size) {
-            printf("Insert Error: Hash Table is full\n");
+            fprintf(stderr, "Insert Error: Hash Table is full\n");
             free_item(item);
             return;
         }
 
         table->items[index] = item;
         table->count++;
+        add_dynamic_array(table->keys, key);
     }
     else {
         if (strcmp(current_item->key, key) == 0) {
@@ -231,14 +233,13 @@ void ht_insert(HashTable *table, char *key, void *value, size_t value_size, Valu
             memcpy(table->items[index]->value, value, value_size);
             table->items[index]->value_size = value_size;
             table->items[index]->value_type = value_type;
-            return;
         }
         else {
             // TODO: FIX ME
             Ht_item *item = create_item(key, value, value_size, value_type);
             handle_collision(table, index, item);
-            return;
         }
+        add_dynamic_array(table->keys, key);
     }
 }
 
@@ -272,6 +273,7 @@ void ht_delete(HashTable *table, char *key) {
         return;
     }
     else {
+        remove_dynamic_array_by_value(table->keys, key);
         if (head == NULL && strcmp(item->key, key) == 0) {
             table->items[index] = NULL;
             free_item(item);
@@ -345,7 +347,7 @@ void print_item(Ht_item *item){
 void print_table(HashTable *table, int indent) {
     char *indent_str = malloc((sizeof(char) * indent) + 1);
     if (indent_str == NULL){
-        printf("could not allocate indent\n");
+        fprintf(stderr, "could not allocate indent\n");
         exit(1);
     }
     int i = 0;
@@ -355,6 +357,13 @@ void print_table(HashTable *table, int indent) {
     indent_str[i] = '\0';
 
     printf("\n%sHash Table\n%s-------------------\n", indent_str, indent_str);
+
+    printf("keys:\n");
+    char **elements = table->keys->elements;
+    for (size_t i = 0; i < table->keys->count; i++){
+        printf("%s, ", elements[i]);
+    }
+    printf("\n");
 
     for (int i = 0; i < table -> size; i++) {
         if (table -> items[i]) {

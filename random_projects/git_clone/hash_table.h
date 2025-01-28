@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "dynamic_array.h"
 
 typedef enum {
     TYPE_BOOL,
@@ -30,6 +31,7 @@ typedef struct LinkedList {
 typedef struct HashTable{
     Ht_item **items;
     LinkedList** overflow_buckets;
+    DynamicArray *keys;
     int size;
     int count;
 }HashTable;
