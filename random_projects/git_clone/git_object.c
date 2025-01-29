@@ -354,10 +354,16 @@ void free_git_object(GitObject *object){
     switch (object->type) {
         case TYPE_BLOB:{
             GitBlob *blob = object->value;
-            free(blob->blobdata);
+            if (blob->blobdata != NULL){
+                free(blob->blobdata);
+            }
             break;
         }
         case TYPE_COMMIT:{
+            GitCommit *commit = object->value;
+            if (commit->kvlm != NULL){
+                free_table(commit->kvlm);
+            }
             break;
         }
         case TYPE_TAG:{

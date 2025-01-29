@@ -4,13 +4,14 @@ CFLAGS = -Wall -Wextra -Iinclude -w  # Include the directory where exercise.h is
 LDFLAGS = -lz -lcrypto
 TARGET = git_clone
 SRC_FILES = hash_table.c dynamic_array.c ini_parser.c repository.c utils.c bridges.c git_object.c kvlm.c main.c
+GDB = -g
 
 # Build target
 all: $(TARGET)
 
 # Compile the source files (main.c, exercise.c, munit.c) into the TARGET executable
 $(TARGET): $(SRC_FILES)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC_FILES) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC_FILES) $(LDFLAGS) $(GDB)
 
 # Clean target (removes the executable)
 clean:

@@ -1,4 +1,4 @@
-#include "kvlm.h"
+#include "dynamic_array.h"
 
 DynamicArray *new_dynamic_array(DynamicArrayType type, size_t size){
     if (size == 0){
@@ -77,7 +77,6 @@ int add_dynamic_array(DynamicArray *array, void *value){
             }
             new[0] = '\0';
             strcpy(new, (char *)value);
-            new[strlen((char *)value)] = '\0';
 
             elements[array->count++] = new;
             break;

@@ -27,22 +27,35 @@ HashTable *kvlm_parser(char *raw, size_t raw_size){
     }
 
     while(res){
-        res = kvlm_parse(raw, raw_size, table, &i, key, &key_size, val, &val_size);
+        res = kvlm_parse(raw, raw_size, table, &i, &key, &key_size, &val, &val_size);
         if (res == -1){
             fprintf(stderr, "kvlm parsing fialed\n");
             if (table != NULL){
                 free_table(table);
             }
+            if (key != NULL){
+                free(key);
+            }
+            if (val != NULL){
+                free(val);
+            }
             return NULL;
         }
+    }
+
+    if (key != NULL){
+        free(key);
+    }
+    if (val != NULL){
+        free(val);
     }
 
     return table;
 }
 
-int kvlm_parse(char *raw, size_t raw_size, HashTable *table, size_t *i, char *key, size_t *key_size, char *value, size_t *value_size){
-    int spc = find_char(raw, ' ', *i);
-    int nl = find_char(raw, '\n', *i);
+int kvlm_parse(char *raw, size_t raw_size, HashTable *table, size_t *i, char **key, size_t *key_size, char **value, size_t *value_size){
+    int spc = find_char(raw, ' ', *i, raw_size);
+    int nl = find_char(raw, '\n', *i, raw_size);
 
     if (spc < 0 || nl < spc){
         if (nl != *i){
@@ -52,39 +65,38 @@ int kvlm_parse(char *raw, size_t raw_size, HashTable *table, size_t *i, char *ke
 
         if (strlen(GIT_CLONE_KVLM_END_KEY) >= *key_size){
             (*key_size) = (strlen(GIT_CLONE_KVLM_END_KEY)) * 2;
-            char *temp = realloc(key, sizeof(char) * (*key_size));
+            char *temp = realloc(*key, sizeof(char) * (*key_size));
             if (temp == NULL){
-                fprintf(stderr, "unable to allocate memory for key in kvlm_parse\n");
+                fprintf(stderr, "1unable to allocate memory for key in kvlm_parse\n");
                 return -1;
             }
-            key = temp;
+            *key = temp;
         }
 
         if (raw_size - (*i + 1) >= *value_size){
             (*value_size) = (raw_size - (*i + 1)) * 2;
-            char *temp = realloc(value, sizeof(char) * (*value_size));
+            char *temp = realloc(*value, sizeof(char) * (*value_size));
             if (temp == NULL){
                 value = NULL;
-                fprintf(stderr, "unable to allocate memory for key in kvlm_parse\n");
+                fprintf(stderr, "unable to allocate memory for value in kvlm_parse\n");
                 return -1;
             }
-            value = temp;
+            *value = temp;
         }
 
-        memset(key, 0, sizeof(char) * (strlen(GIT_CLONE_KVLM_END_KEY)));
-        memcpy(key, GIT_CLONE_KVLM_END_KEY, sizeof(char) * (strlen(GIT_CLONE_KVLM_END_KEY)));
-        memcpy(value, raw + (*i + 1), sizeof(char) * (raw_size - (*i + 1)));
-        key[strlen(GIT_CLONE_KVLM_END_KEY)] = '\0';
-        value[raw_size - (*i + 1)] = '\0';
-        Ht_item *item = ht_search(table, key);
+        memcpy(*key, GIT_CLONE_KVLM_END_KEY, sizeof(char) * (strlen(GIT_CLONE_KVLM_END_KEY)));
+        memcpy(*value, raw + (*i + 1), sizeof(char) * (raw_size - (*i + 1)));
+        (*key)[strlen(GIT_CLONE_KVLM_END_KEY)] = '\0';
+        (*value)[raw_size - (*i + 1)] = '\0';
+        Ht_item *item = ht_search(table, *key);
         if (item == NULL){
             DynamicArray *array = new_dynamic_array(TYPE_ARRAY_STR, 0);
-            add_dynamic_array(array, value);
-            ht_insert(table, key, array, sizeof(DynamicArray), TYPE_ARRAY);
+            add_dynamic_array(array, *value);
+            ht_insert(table, *key, array, sizeof(DynamicArray), TYPE_ARRAY);
             free(array);
         }else{
             DynamicArray *array = item->value;
-            add_dynamic_array(array, value);
+            add_dynamic_array(array, *value);
         }
 
         return 0;
@@ -92,17 +104,17 @@ int kvlm_parse(char *raw, size_t raw_size, HashTable *table, size_t *i, char *ke
 
     if (spc - (*i) >= *key_size){
         (*key_size) = (spc - (*i)) * 2;
-        char *temp = realloc(key, sizeof(char) * (*key_size));
+        char *temp = realloc(*key, sizeof(char) * (*key_size));
         if (temp == NULL){
-            fprintf(stderr, "unable to allocate memory for key in kvlm_parse\n");
+            fprintf(stderr, "2unable to allocate memory for key in kvlm_parse %d %ld\n", spc, spc - (*i));
             return -1;
         }
-        key = temp;
+        *key = temp;
     }
 
     int end = *i;
     while(1){
-        end = find_char(raw, '\n', end+1);
+        end = find_char(raw, '\n', end+1, raw_size);
         if (end >= raw_size){
             break;
         }
@@ -113,29 +125,28 @@ int kvlm_parse(char *raw, size_t raw_size, HashTable *table, size_t *i, char *ke
 
     if (end - (spc + 1) >= *value_size){
         (*value_size) = (end - (spc + 1)) * 2;
-        char *temp = realloc(value, sizeof(char) * (*value_size));
+        char *temp = realloc(*value, sizeof(char) * (*value_size));
         if (temp == NULL){
-            fprintf(stderr, "unable to allocate memory for key in kvlm_parse\n");
+            fprintf(stderr, "unable to allocate memory for value in kvlm_parse\n");
             return -1;
         }
-        value = temp;
+        *value = temp;
     }
 
-    memset(key, 0, sizeof(char) * (spc - (*i)));
-    memcpy(key, raw + (*i), sizeof(char) * (spc - (*i)));
-    memcpy(value, raw + (spc + 1), sizeof(char) * (end - (spc + 1)));
-    key[spc - (*i)] = '\0';
-    value[end - (spc + 1)] = '\0';
+    memcpy(*key, raw + (*i), sizeof(char) * (spc - (*i)));
+    memcpy(*value, raw + (spc + 1), sizeof(char) * (end - (spc + 1)));
+    (*key)[spc - (*i)] = '\0';
+    (*value)[end - (spc + 1)] = '\0';
 
-    Ht_item *item = ht_search(table, key);
+    Ht_item *item = ht_search(table, *key);
     if (item == NULL){
         DynamicArray *array = new_dynamic_array(TYPE_ARRAY_STR, 0);
-        add_dynamic_array(array, value);
-        ht_insert(table, key, array, sizeof(DynamicArray), TYPE_ARRAY);
+        add_dynamic_array(array, *value);
+        ht_insert(table, *key, array, sizeof(DynamicArray), TYPE_ARRAY);
         free(array);
     }else{
         DynamicArray *array = item->value;
-        add_dynamic_array(array, value);
+        add_dynamic_array(array, *value);
     }
 
     *i = end + 1;

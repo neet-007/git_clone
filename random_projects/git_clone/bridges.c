@@ -99,12 +99,14 @@ void log_graphviz(GitRepository *repo, char *sha, HashTable *table){
         return;
     }
     if (commit_object->type != TYPE_COMMIT){
+        free_git_object(commit_object);
         fprintf(stderr, "object is not type commit %s its %d\n", sha, commit_object->type);
         return;
     }
 
     GitCommit *commit = commit_object->value;
     if (commit->kvlm == NULL){
+        free_git_object(commit_object);
         fprintf(stderr, "kvlm is null %s\n", sha);
         return;
     }
@@ -112,16 +114,17 @@ void log_graphviz(GitRepository *repo, char *sha, HashTable *table){
     //TODO: see this utf-8 stuff about message and do the \ -> \\, " -> \" replacment
     Ht_item *message = ht_search(commit->kvlm, GIT_CLONE_KVLM_END_KEY);
     if (message == NULL){
+        free_git_object(commit_object);
         fprintf(stderr, "end message is not in kvlm %s\n", sha);
         return;
     }
     DynamicArray *message_array = message->value;
     char **message_array_strs = message_array->elements;
 
-    size_t len_message = strlen((char *)message_array_strs[0]);
+    size_t len_message = strlen((char *)(message_array_strs[0]));
     size_t i = 0;
     while(i < len_message){
-        if (((char *)message->value)[i] == '\n'){
+        if (((char *)(message_array_strs[0]))[i] == '\n'){
             break;
         }
         i++;
@@ -131,10 +134,12 @@ void log_graphviz(GitRepository *repo, char *sha, HashTable *table){
 
     Ht_item *parents = ht_search(commit->kvlm, "parent");
     if (parents == NULL){
+        free_git_object(commit_object);
         return;
     }
 
     if (parents->value_type != TYPE_ARRAY){
+        free_git_object(commit_object);
         fprintf(stderr, "parent must have type TYPE_ARRAY not %d in log_graphviz\n", parents->value_type);
         return;
     }
@@ -145,6 +150,7 @@ void log_graphviz(GitRepository *repo, char *sha, HashTable *table){
         printf("  c_%s -> c_%s;\n", sha, parents_strs[i]);
         log_graphviz(repo, parents_strs[i], table);
     }
+    free_git_object(commit_object);
 }
 
 int cmd_log(char *commit){
@@ -175,6 +181,7 @@ int cmd_log(char *commit){
     printf("}\n");
 
     free_repo(repo);
+    free_table(table);
     free(sha);
     return 0;
 }

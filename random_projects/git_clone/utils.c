@@ -362,12 +362,20 @@ char *file_read_all(FILE *f, size_t *data_size){
     return data;
 }
 
-int find_char(char *raw, char c, int start) {
-    if (!raw || start < 0 || start >= strlen(raw)) {
+int find_char(char *raw, char c, int start, size_t raw_size) {
+    if (!raw || start < 0 || start >= raw_size) {
         return -1;
     }
 
-    const char *pos = strchr(raw + start, c);
+    size_t pos = start;
+    bool found = false;
+    while (pos < raw_size){
+        if (raw[pos] == c){
+            found = true;
+            break;
+        }
+        pos++;
+    }
 
-    return pos ? pos - raw : -1;
+    return found ? pos : -1;
 }
