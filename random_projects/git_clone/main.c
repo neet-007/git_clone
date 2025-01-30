@@ -75,6 +75,24 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "usage:git_clone log COMMIT\n");
         return 1;
     }
+    if (strcmp(argv[1], "ls-tree") == 0){
+        char *tree = NULL;
+        bool r = false;
+
+        for (int i = 2; i < argc; i++){
+            if (argv[i][0] == '-'){
+                if (strlen(argv[i]) == 2 && argv[i][1] == 'r'){
+                    r = true;
+                    continue;
+                }
+
+                fprintf(stderr, "usage:git_clone ls-tree [-r] TREE");
+            }
+            tree = argv[i];
+        }
+
+        return cmd_ls_tree(tree, r);
+    }
 
     return 0;
 }

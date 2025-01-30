@@ -1,6 +1,7 @@
 #include "bridges.h"
 #include "git_object.h"
 #include "hash_table.h"
+#include "utils.h"
 
 int cmd_init(char *path){
     GitRepository *repo = repo_create(path);
@@ -184,4 +185,101 @@ int cmd_log(char *commit){
     free_table(table);
     free(sha);
     return 0;
+}
+
+// r=false, prefix=""
+int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
+    char *sha = object_find(repo, ref, "tree", true);
+    if (sha == NULL){
+        fprintf(stderr, "uanble to find sha in ls_tree\n");
+        return 1;
+    }
+
+    GitObject *object = object_read(repo, sha);
+    if (object == NULL){
+        fprintf(stderr, "uanble to read object with sha %s in ls_tree\n", sha);
+        free(sha);
+        return 1;
+    }
+
+    if (object->type != TYPE_TREE){
+        fprintf(stderr, "uanble object with sha %s is not tree in ls_tree\n", sha);
+        free(sha);
+        free(object);
+    }
+
+    GitTree *tree = object->value;
+    size_t i = 0;
+    GitObjectType type;
+    GitTreeLeaf *curr = NULL;
+
+    while(i < tree->items_len){
+        curr = tree->items[i];
+        if (curr->mode[0] == '0'){
+            if (curr->mode[1] == '4'){
+                type = TYPE_TREE;
+            }else{
+                fprintf(stderr, "unknown object type in ls_tree %.6s\n", curr->mode);
+                free(sha);
+                free(object);
+                return 1;
+            }
+        }else if (curr->mode[0] == '1'){
+            if (curr->mode[1] == '0'){
+                type = TYPE_BLOB;
+            }else if (curr->mode[1] == '2'){
+                type = TYPE_BLOB;
+            }else if (curr->mode[1] == '6'){
+                type = TYPE_COMMIT;
+            }else{
+                fprintf(stderr, "unknown object type in ls_tree %.6s\n", curr->mode);
+                free(sha);
+                free(object);
+                return 1;
+            }
+        }else{
+            fprintf(stderr, "unknown object type in ls_tree %.6s\n", curr->mode);
+            free(sha);
+            free(object);
+            return 1;
+        }
+
+        char *joined = join_path(prefix, 1, curr->path);
+        if (joined == NULL){
+            fprintf(stderr, "unable to join path %s in ls_tree\n", curr->path);
+            free(sha);
+            free(object);
+            return 1;
+        }
+        if (!(r && type == TYPE_TREE)){
+            printf("%.6s %s %s\t%s\n", curr->mode, "tree", curr->sha, joined);
+        }else{
+            int res = ls_tree(repo, curr->sha, r, joined);
+            if (res != 0){
+                fprintf(stderr, "error in ls_tree\n");
+                free(joined);
+                free(sha);
+                free(object);
+                return 1;
+            }
+        }
+        free(joined);
+        i++;
+    }
+    free(sha);
+    free_git_object(object);
+    return 0;
+}
+
+int cmd_ls_tree(char *tree, bool r){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo\n");
+        return 1;
+    }
+
+    int res = ls_tree(repo, tree, r, "");
+    free_repo(repo);
+
+    return res;
 }

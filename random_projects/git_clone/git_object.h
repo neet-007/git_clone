@@ -4,27 +4,8 @@
 #include "repository.h"
 #include "utils.h"
 #include "kvlm.h"
-
-typedef enum GitObjectType{
-    TYPE_BLOB,
-    TYPE_COMMIT,
-    TYPE_TAG,
-    TYPE_TREE,
-} GitObjectType;
-
-typedef struct GitObject{
-    GitObjectType type;
-    void *value;
-} GitObject;
-
-typedef struct GitBlob{
-    char *blobdata;
-    size_t blobdata_size;
-} GitBlob;
-
-typedef struct GitCommit{
-    HashTable *kvlm;
-} GitCommit;
+#include "tree_parser.h"
+#include "git_object_types.h"
 
 char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_size);
 int git_object_deserialize(GitObject *object, void *data, size_t data_size);

@@ -16,7 +16,7 @@ char *join_path_(char *path, unsigned int count, va_list va_a){
     va_list vb;
     va_copy(va, va_a);
 
-    if (path[path_len - 1] != '/'){
+    if (strcmp(path, "") != 0 && path[path_len - 1] != '/'){
         add_dir_sep |= (1 << 0);
         new_path_len++;
     }

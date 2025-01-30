@@ -1,4 +1,5 @@
 #include "git_object.h"
+#include "tree_parser.h"
 
 char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_size){
     char *ret = NULL;
@@ -8,6 +9,9 @@ char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_
             ret = malloc(sizeof(char) * (blob->blobdata_size));
             if (ret == NULL){
                 fprintf(stderr, "unable to allocate memory for blobdata in git_object_serializer %ld\n", blob->blobdata_size);
+                if (ret){
+                    free(ret);
+                }
                 return NULL;
             }
             *data_size = blob->blobdata_size;
@@ -16,15 +20,11 @@ char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_
         }
         case TYPE_COMMIT:{
             GitCommit *commit = object->value;
-            char *temp = kvlm_serialize(commit->kvlm, data_size);
-            if (temp == NULL){
+            ret = kvlm_serialize(commit->kvlm, data_size);
+            if (ret == NULL){
                 fprintf(stderr, "unable to serialize kvlm in git_object_serializer\n");
-                if (ret){
-                    free(ret);
-                    return NULL;
-                }
+                return NULL;
             }
-            ret = temp;
             break;
         }
         case TYPE_TAG:{
@@ -32,7 +32,12 @@ char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_
             break;
         }
         case TYPE_TREE:{
-
+            GitTree *tree = object->value;
+            ret = tree_serialize(tree, data_size);
+            if (ret == NULL){
+                fprintf(stderr, "unable to allocate memory for tree_data in git_object_serializer\n");
+                return NULL;
+            }
             break;
         }
         default:{
@@ -51,7 +56,15 @@ int git_object_deserialize(GitObject *object, void *data, size_t data_size){
     switch (object->type) {
         case TYPE_BLOB:{
             GitBlob *blob = object->value;
-            blob->blobdata = data;
+            blob->blobdata = malloc(sizeof(char) * data_size);
+            if (blob->blobdata == NULL){
+                fprintf(stderr, "unable to allocate memory for blobdata in new_git_object\n");
+                free(blob);
+                return NULL;
+            }
+
+            memcpy(blob->blobdata, data, sizeof(char) * data_size);
+            blob->blobdata_size = data_size;
 
             break;
         }
@@ -69,7 +82,14 @@ int git_object_deserialize(GitObject *object, void *data, size_t data_size){
             break;
         }
         case TYPE_TREE:{
-
+            GitTree *tree = object->value;
+            tree->items = tree_parse(data, data_size, &tree->items_len, &tree->items_size);
+            if (tree->items == NULL){
+                if (tree->items == NULL){
+                    fprintf(stderr, "unable to prase tree in git_object_desirzile\n");
+                    return 0;
+                }
+            }
             break;
         }
     }
@@ -91,16 +111,6 @@ GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
                 fprintf(stderr, "unable to allocate memory for blob in new_git_object\n");
                 return NULL;
             }
-
-            blob->blobdata = malloc(sizeof(char) * data_size);
-            if (blob->blobdata == NULL){
-                fprintf(stderr, "unable to allocate memory for blobdata in new_git_object\n");
-                free(blob);
-                return NULL;
-            }
-
-            memcpy(blob->blobdata, data, sizeof(char) * data_size);
-            blob->blobdata_size = data_size;
             object->value = blob;
             break;
         }
@@ -113,7 +123,6 @@ GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
             }
             commit->kvlm = NULL;
             object->value = commit;
-            git_object_deserialize(object, data, data_size);
             break;
         }
         case TYPE_TAG:{
@@ -121,11 +130,24 @@ GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
             break;
         }
         case TYPE_TREE:{
-
+            object->type = TYPE_TREE;
+            GitTree *tree = malloc(sizeof(GitTree));
+            if (tree == NULL){
+                fprintf(stderr, "unable to allocate memory for tree in new_git_object\n");
+                return NULL;
+            }
+            tree->items = NULL;
+            tree->items_size = 0;
+            tree->items_len = 0;
+            object->value = tree;
             break;
         }
     }
 
+    if (git_object_deserialize(object, data, data_size) < 1){
+        fprintf(stderr, "object deserialization failed\n");
+        return NULL;
+    }
     return object;
 }
 
@@ -370,6 +392,16 @@ void free_git_object(GitObject *object){
             break;
         }
         case TYPE_TREE:{
+            GitTree *tree = object->value;
+            size_t i = 0;
+            GitTreeLeaf *curr = NULL;
+            while(i < tree->items_len){
+                curr = tree->items[i];
+                free(curr->path);
+                free(curr);
+                i++;
+            }
+            free(tree->items);
             break;
         }
     }
