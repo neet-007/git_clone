@@ -9,5 +9,6 @@ int cmd_cat_file(char *object, char *fmt);
 int cmd_hash_object(char *path, char *type, bool write);
 int cmd_log(char *commit);
 int cmd_ls_tree(char *tree, bool r);
+int cmd_checkout(char *commit, char *path);
 
 #endif

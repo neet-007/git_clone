@@ -1,5 +1,6 @@
 #include "bridges.h"
 #include "git_object.h"
+#include "git_object_types.h"
 #include "hash_table.h"
 #include "utils.h"
 
@@ -203,7 +204,7 @@ int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
     }
 
     if (object->type != TYPE_TREE){
-        fprintf(stderr, "uanble object with sha %s is not tree in ls_tree\n", sha);
+        fprintf(stderr, "object with sha %s is not tree in ls_tree\n", sha);
         free(sha);
         free(object);
     }
@@ -280,6 +281,183 @@ int cmd_ls_tree(char *tree, bool r){
 
     int res = ls_tree(repo, tree, r, "");
     free_repo(repo);
+
+    return res;
+}
+
+int tree_checkout(GitRepository *repo, GitTree *tree, char *path){
+    size_t i = 0;
+    GitTreeLeaf *curr = NULL;
+    GitObject *curr_object = NULL;
+    GitBlob *curr_blob = NULL;
+    GitTree *curr_tree = NULL;
+    FILE *f = NULL;
+
+    while(i < tree->items_len){
+        curr = tree->items[i];
+
+        curr_object = object_read(repo, curr->sha);
+        if (curr_object == NULL){
+            fprintf(stderr, "unbale to read object with sha %s in tree_checkout\n", curr->sha);
+            return 1;
+        }
+
+        char *dest = join_path(path, 1, curr->path);
+        if (dest == NULL){
+            fprintf(stderr, "unbale to read object with sha %s in tree_checkout\n", curr->sha);
+            free_git_object(curr_object);
+            return 1;
+        }
+
+        if (curr_object->type == TYPE_TREE){
+            make_directories(dest);
+            curr_tree = curr_object->value;
+            int res = tree_checkout(repo, curr_tree, dest);
+            if (res != 0){
+                fprintf(stderr, "error sha %s path %s in tree_checkout\n", curr->sha, dest);
+                free(dest);
+                free_git_object(curr_object);
+                return 1;
+            }
+        }else if (curr_object->type == TYPE_BLOB){
+            //TODO: do symlinks
+            curr_blob = curr_object->value;
+            f = fopen(dest, "wb");
+            if (f == NULL){
+                fprintf(stderr, "unbale to open file with path %s in tree_checkout\n", dest);
+                free(dest);
+                free_git_object(curr_object);
+                return 1;
+            }
+
+            fwrite(curr_blob->blobdata, sizeof(char), curr_blob->blobdata_size, f);
+            fclose(f);
+        }
+        free_git_object(curr_object);
+        free(dest);
+        i++;
+    }
+    return 0;
+}
+
+int cmd_checkout(char *commit, char *path){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_checkout\n");
+        return 1;
+    }
+
+    char *sha = object_find(repo, commit, "", true);
+    if (sha == NULL){
+        fprintf(stderr, "unable to find object commit %s in cmd_checkout\n", commit);
+        free_repo(repo);
+        return 1;
+    }
+
+    GitObject *object = object_read(repo, sha);
+    if (object == NULL){
+        fprintf(stderr, "unable to raed object commit %s sha %s in cmd_checkout\n", commit, sha);
+        free(sha);
+        free_repo(repo);
+        return 1;
+    }
+
+    if (object->type != TYPE_TREE && object->type != TYPE_COMMIT){
+        fprintf(stderr, "object must be tree or commit not %d commit %s sha %s in cmd_checkout\n", object->type, commit, sha);
+        free(sha);
+        free_repo(repo);
+        free_git_object(object);
+        return 1;
+    }
+
+    if (object->type == TYPE_COMMIT){
+        GitCommit *commit = object->value;
+        Ht_item *tree_item = ht_search(commit->kvlm, "tree");
+        if (tree_item == NULL){
+            fprintf(stderr, "unable to get tree from commit object %s path c%s in cmd_checkout\n", sha, path);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+        if (tree_item->value_type != TYPE_ARRAY){
+            fprintf(stderr, "unable to get tree from commit object %s path c%s in cmd_checkout\n", sha, path);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+        DynamicArray *tree_array = tree_item->value;
+        char **tree_array_elements = tree_array->elements;
+        if (tree_array->count <= 0){
+            fprintf(stderr, "unable to get tree from commit object %s path c%s in cmd_checkout\n", sha, path);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+
+        GitObject *temp = object_read(repo, tree_array_elements[0]);
+        if (temp == NULL){
+            fprintf(stderr, "unable to read object sha %s path %s in cmd_checkout\n", sha, path);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+
+        if (temp->type != TYPE_TREE){
+            fprintf(stderr, "object must be tree not %d sha %s path %s in cmd_checkout\n", object->type, sha, path);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            free_git_object(temp);
+            return 1;
+        }
+        free_git_object(object);
+        object = temp;
+    }
+
+    if (PATH_EXISTS(path)){
+        if (!is_dir(path)){
+            fprintf(stderr, "path does not exitst %s commit %s sha %s in cmd_checkout\n", path, commit, sha);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+        if (!is_dir_empty(path)){
+            fprintf(stderr, "path is not empty %s commit %s sha %s in cmd_checkout\n", path, commit, sha);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+    }else{
+        int res = make_directories(path);
+        if (res < 1){
+            fprintf(stderr, "unable to make dir %s commit %s sha %s in cmd_checkout\n", path, commit, sha);
+            free(sha);
+            free_repo(repo);
+            free_git_object(object);
+            return 1;
+        }
+    }
+
+    char *real_path = realpath(path, NULL);
+    if (real_path == NULL){
+        fprintf(stderr, "realpath failed for cmd_checkout %s\n", path);
+        free(sha);
+        free_repo(repo);
+        free_git_object(object);
+        return NULL;
+    }
+
+    int res = tree_checkout(repo, (GitTree *)object->value, real_path);
+    free(real_path);
+    free(sha);
+    free_repo(repo);
+    free_git_object(object);
 
     return res;
 }

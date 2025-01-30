@@ -87,11 +87,20 @@ int main(int argc, char *argv[]){
                 }
 
                 fprintf(stderr, "usage:git_clone ls-tree [-r] TREE");
+                return 1;
             }
             tree = argv[i];
         }
 
         return cmd_ls_tree(tree, r);
+    }
+    if (strcmp(argv[1], "checkout") == 0){
+        if (argc != 4){
+            fprintf(stderr, "usage:git_clone checkout COMMIT PATH");
+            return 1;
+        }
+
+        return cmd_checkout(argv[2], argv[3]);
     }
 
     return 0;
