@@ -157,6 +157,7 @@ char *kvlm_serialize(HashTable *kvlm, size_t *data_size){
     size_t size = 0;
     size_t curr = 0;
     size_t i;
+    size_t j;
     char *ret = NULL;
 
     char **kvlm_keys = kvlm->keys->elements;
@@ -181,11 +182,12 @@ char *kvlm_serialize(HashTable *kvlm, size_t *data_size){
         val_array = val->value;
         val_str_array = val_array->elements;
 
-        for (i = 0; i < val_array->count; i++){
-            size += (strlen(val_str_array[i]) + 1);
+        for (j = 0; j < val_array->count; j++){
+            size += (strlen(val_str_array[j]) + 1);
         }
     }
     size++;
+    *data_size = size;
     ret = malloc(sizeof(char) * size);
     if (ret == NULL){
         fprintf(stderr, "unable to allocate memory for ret\n");
@@ -213,9 +215,9 @@ char *kvlm_serialize(HashTable *kvlm, size_t *data_size){
         val_array = val->value;
         val_str_array = val_array->elements;
 
-        for (i = 0; i < val_array->count; i++){
-            memcpy(ret + curr, val_str_array[i], strlen(val_str_array[i]));
-            curr += strlen(val_str_array[i]);
+        for (j = 0; j < val_array->count; j++){
+            memcpy(ret + curr, val_str_array[j], strlen(val_str_array[j]));
+            curr += strlen(val_str_array[j]);
             ret[curr + 1] = '\n';
         }
     }
@@ -234,5 +236,11 @@ char *kvlm_serialize(HashTable *kvlm, size_t *data_size){
     ret[curr++] = '\n';
     memcpy(ret + curr, val_str_array[0], strlen(val_str_array[0]));
     
+    size_t a = 0;
+    while(a < *data_size){
+        printf("%c", ret[a]);
+        a++;
+    }
+
     return ret;
 }

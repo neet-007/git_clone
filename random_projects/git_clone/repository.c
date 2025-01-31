@@ -164,7 +164,7 @@ char *repo_dir_variadic(GitRepository *repo, bool mkdir, unsigned int count, va_
         }
     }
 
-    if (mkdir == true){
+    if (mkdir){
         if (make_directories(path) != 1){
             fprintf(stderr, "error making dir for %s\n", path);
             free(path);

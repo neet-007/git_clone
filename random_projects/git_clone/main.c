@@ -110,6 +110,41 @@ int main(int argc, char *argv[]){
 
         return cmd_show_ref();
     }
+    if (strcmp(argv[1], "tag") == 0){
+        if (argc == 2){
+            return cmd_git_tag(NULL, NULL, false);
+        }
+        if (2 < argc && argc < 6){
+            bool a = false;
+            char *name = NULL;
+            char *object = NULL;
+
+            for (int i = 2; i < argc; i++){
+                if (argv[i][0] == '-'){
+                    if (strlen(argv[i]) == 2 && argv[i][1] == 'a'){
+                        a = true;
+                        continue;
+                    }
+
+                    fprintf(stderr, "usage:git_clone tag [-a] NAME OBJECT\n");
+                    return 1;
+                }
+                if (name == NULL){
+                    name = argv[i];
+                }else if(object == NULL){
+                    object = argv[i];
+                }else{
+                    fprintf(stderr, "usage:git_clone tag [-a] NAME OBJECT\n");
+                    return 1;
+                }
+            }
+
+            return cmd_git_tag(name, object, a);
+        }
+
+        fprintf(stderr, "usage:git_clone tag [-a] NAME OBJECT\n");
+        return 1;
+    }
 
     return 0;
 }

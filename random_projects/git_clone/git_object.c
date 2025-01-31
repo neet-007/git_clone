@@ -28,7 +28,12 @@ char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_
             break;
         }
         case TYPE_TAG:{
-
+            GitTag *tag = object->value;
+            ret = kvlm_serialize(tag->kvlm, data_size);
+            if (ret == NULL){
+                fprintf(stderr, "unable to serialize kvlm in git_object_serializer\n");
+                return NULL;
+            }
             break;
         }
         case TYPE_TREE:{
@@ -78,7 +83,12 @@ int git_object_deserialize(GitObject *object, void *data, size_t data_size){
             break;
         }
         case TYPE_TAG:{
-
+            GitTag *tag = object->value;
+            tag->kvlm = kvlm_parser(data, data_size);
+            if (tag->kvlm == NULL){
+                fprintf(stderr, "unable to prase kvlm in git_object_desirzile\n");
+                return 0;
+            }
             break;
         }
         case TYPE_TREE:{
@@ -126,7 +136,14 @@ GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
             break;
         }
         case TYPE_TAG:{
-
+            object->type = TYPE_TAG;
+            GitTag *tag = malloc(sizeof(GitTag));
+            if (tag == NULL){
+                fprintf(stderr, "unable to allocate memory for tag in new_git_object\n");
+                return NULL;
+            }
+            tag->kvlm = NULL;
+            object->value = tag;
             break;
         }
         case TYPE_TREE:{
@@ -324,7 +341,10 @@ char *object_write(GitObject *object, GitRepository *repo){
 
     sha1_hexdigest((unsigned char *)to_hash, to_hash_len, hexdigest);
     if (repo != NULL){
-        char *path = repo_file(repo, true, 3, "objects", hexdigest + 2);
+        char sha_start[3];
+        sha_start[0] = '\0';
+        strncpy(sha_start, hexdigest, 2);
+        char *path = repo_file(repo, true, 3, "objects", sha_start, hexdigest + 2);
         if (path == NULL){
             fprintf(stderr, "unable to allocate memory for to_hash for object_write\n");
             free(data);
@@ -389,6 +409,10 @@ void free_git_object(GitObject *object){
             break;
         }
         case TYPE_TAG:{
+            GitTag *tag = object->value;
+            if (tag->kvlm != NULL){
+                free_table(tag->kvlm);
+            }
             break;
         }
         case TYPE_TREE:{

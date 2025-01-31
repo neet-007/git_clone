@@ -15,5 +15,6 @@ int cmd_log(char *commit);
 int cmd_ls_tree(char *tree, bool r);
 int cmd_checkout(char *commit, char *path);
 int cmd_show_ref();
+int cmd_git_tag(char *name, char *object, bool a);
 
 #endif

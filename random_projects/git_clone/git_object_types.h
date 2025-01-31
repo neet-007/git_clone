@@ -41,4 +41,8 @@ typedef struct GitTree{
     size_t items_len;
 } GitTree;
 
+typedef struct GitTag{
+    HashTable *kvlm;
+} GitTag;
+
 #endif
