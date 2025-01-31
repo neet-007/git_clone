@@ -102,6 +102,14 @@ int main(int argc, char *argv[]){
 
         return cmd_checkout(argv[2], argv[3]);
     }
+    if (strcmp(argv[1], "show-ref") == 0){
+        if (argc != 2){
+            fprintf(stderr, "usage:git_clone show-ref\n");
+            return 1;
+        }
+
+        return cmd_show_ref();
+    }
 
     return 0;
 }

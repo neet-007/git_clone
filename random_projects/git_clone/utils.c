@@ -379,3 +379,48 @@ int find_char(char *raw, char c, int start, size_t raw_size) {
 
     return found ? pos : -1;
 }
+
+int compare(const void *a, const void *b) {
+    return strcmp(*(const char **)a, *(const char **)b);
+}
+
+char **list_directory_sorted(char *path, size_t *count) {
+    struct dirent *entry;
+    DIR *dir = opendir(path);
+    if (!dir) {
+        perror("opendir");
+        fprintf(stderr, "unable to open dir in list_directory_sorted %s\n", path);
+        return NULL;
+    }
+
+    char **filenames = NULL;
+    filenames = malloc(sizeof(char) * 16);
+    *count = 0;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        filenames = realloc(filenames, sizeof(char *) * ((*count) + 1));
+        if (!filenames) {
+            perror("realloc");
+            fprintf(stderr, "unable to allocate memory for filenames in list_directory_sorted %s\n", path);
+            closedir(dir);
+            return NULL;
+        }
+        filenames[(*count)] = strdup(entry->d_name);
+        if (!filenames[(*count)]) {
+            perror("strdup");
+            fprintf(stderr, "unable to allocate memory for strdup in list_directory_sorted %s\n", path);
+            closedir(dir);
+            return NULL;
+        }
+        (*count)++;
+    }
+
+    closedir(dir);
+
+    qsort(filenames, *count, sizeof(char *), compare);
+
+    return filenames;
+}

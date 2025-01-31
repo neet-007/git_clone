@@ -1,8 +1,4 @@
 #include "bridges.h"
-#include "git_object.h"
-#include "git_object_types.h"
-#include "hash_table.h"
-#include "utils.h"
 
 int cmd_init(char *path){
     GitRepository *repo = repo_create(path);
@@ -458,6 +454,84 @@ int cmd_checkout(char *commit, char *path){
     free(sha);
     free_repo(repo);
     free_git_object(object);
+
+    return res;
+}
+
+// with_hash=true
+int show_ref(GitRepository *repo, HashTable *refs, bool with_hash, char *prefix){
+    int res = 0;
+    DynamicArray *keys_array = refs->keys;
+    Ht_item *curr = NULL;
+    char **keys = keys_array->elements;
+    bool free_next_prefix = false;
+    char *next_prefix = NULL;
+
+    for (size_t i = 0;i < keys_array->count; i++){
+        curr = ht_search(refs, keys[i]);
+        if (curr == NULL){
+            return 1;
+        }
+
+        if (curr->value_type == TYPE_STR){
+            printf("%s%s%s%s%s\n",with_hash ? (char *)curr->value : "",
+                                  with_hash ? " " : "",
+                                  prefix ? prefix : "",
+                                  prefix ? "/" : "", keys[i]);
+        }else if(curr->value_type == TYPE_HASH_TABLE){
+            HashTable *h = curr->value;
+            if (prefix == NULL){
+                free_next_prefix = false;
+                next_prefix = keys[i];
+            }else{
+                free_next_prefix = true;
+                next_prefix = malloc(sizeof(char) * (strlen(prefix) + strlen(keys[i]) + 2));
+                if (next_prefix == NULL){
+                    fprintf(stderr, "unable to allocate memory for next_prefix in show_ref\n");
+                    return 1;
+                }
+                next_prefix[0] = '\0';
+                strcpy(next_prefix, prefix);
+                next_prefix[strlen(prefix)] = '/';
+                next_prefix[strlen(prefix) + 1] = '\0';
+                strcpy(next_prefix + strlen(prefix) + 1, keys[i]);
+                next_prefix[strlen(prefix) + strlen(keys[i]) + 1] = '\0';
+            }
+            res = show_ref(repo, h, with_hash, next_prefix);
+            if (res != 0){
+                if (free_next_prefix && next_prefix != NULL){
+                    free(next_prefix);
+                }
+                fprintf(stderr, "show_ref failed in show_ref\n");
+                return 1;
+            }
+        }
+        if (free_next_prefix){
+            free_next_prefix = false;
+            free(next_prefix);
+        }
+    }
+
+    return 0;
+}
+
+int cmd_show_ref(){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_show_ref\n");
+        return 1;
+    }
+
+    HashTable *refs = ref_list(repo, NULL);
+    if (refs == NULL){
+        fprintf(stderr, "unable to ref list in cmd_show_ref\n");
+        free_repo(repo);
+        return 1;
+    }
+
+    int res = show_ref(repo, refs, true, "refs");
+    free_table(refs);
+    free_repo(repo);
 
     return res;
 }

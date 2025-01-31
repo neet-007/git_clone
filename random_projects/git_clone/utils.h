@@ -29,5 +29,6 @@ void print_raw_data_as_chars(char *data, size_t size);
 void sha1_hexdigest(unsigned char *data, size_t len, char *output);
 char *file_read_all(FILE *f, size_t *data_size);
 int find_char(char *raw, char c, int start, size_t raw_size);
+char **list_directory_sorted(char *path, size_t *count);
 
 #endif
