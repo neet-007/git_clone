@@ -202,7 +202,8 @@ int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
     if (object->type != TYPE_TREE){
         fprintf(stderr, "object with sha %s is not tree in ls_tree\n", sha);
         free(sha);
-        free(object);
+        free_git_object(object);
+        return 1;
     }
 
     GitTree *tree = object->value;
@@ -218,7 +219,7 @@ int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
             }else{
                 fprintf(stderr, "unknown object type in ls_tree %.6s\n", curr->mode);
                 free(sha);
-                free(object);
+                free_git_object(object);
                 return 1;
             }
         }else if (curr->mode[0] == '1'){
@@ -231,13 +232,13 @@ int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
             }else{
                 fprintf(stderr, "unknown object type in ls_tree %.6s\n", curr->mode);
                 free(sha);
-                free(object);
+                free_git_object(object);
                 return 1;
             }
         }else{
             fprintf(stderr, "unknown object type in ls_tree %.6s\n", curr->mode);
             free(sha);
-            free(object);
+            free_git_object(object);
             return 1;
         }
 
@@ -245,7 +246,7 @@ int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
         if (joined == NULL){
             fprintf(stderr, "unable to join path %s in ls_tree\n", curr->path);
             free(sha);
-            free(object);
+            free_git_object(object);
             return 1;
         }
         if (!(r && type == TYPE_TREE)){
@@ -256,7 +257,7 @@ int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
                 fprintf(stderr, "error in ls_tree\n");
                 free(joined);
                 free(sha);
-                free(object);
+                free_git_object(object);
                 return 1;
             }
         }
@@ -684,5 +685,24 @@ int cmd_git_tag(char *name, char *object, bool a){
     free_repo(repo);
     free_table(refs);
 
+    return 0;
+}
+
+int cmd_rev_parse(char *name, GitObjectType type){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_rev_parse\n");
+        return 1;
+    }
+
+    char *res = object_find(repo, name, type, true);
+    if (res == NULL){
+        free_repo(repo);
+        printf("None\n");
+        return 1;
+    }
+    free_repo(repo);
+
+    printf("%s\n", res);
     return 0;
 }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bridges.h"
+#include "git_object_types.h"
 
 int main(int argc, char *argv[]){
     if (argc < 2){
@@ -156,6 +157,44 @@ int main(int argc, char *argv[]){
         }
 
         fprintf(stderr, "usage:git_clone tag [-a] NAME OBJECT\n");
+        return 1;
+    }
+    if (strcmp(argv[1], "rev-parse") == 0){
+        GitObjectType type = TYPE_NONE;
+        if (argc == 3){
+            return cmd_rev_parse(argv[1], type);
+        }
+        if (argc == 5){
+            char *name = NULL;
+            for (int i = 2; i < argc; i++){
+                if (strlen(argv[i]) == 16 && argv[i][0] == '-' && argv[i][1] == '-'){
+                    if (strcmp(argv[i], "--git-clone-type") == 0){
+                        if (i + 1 < argc){
+                            if (strcmp(argv[i + 1], "blob") == 0){
+                                type = TYPE_BLOB;
+                            }else if (strcmp(argv[i + 1], "commit") == 0){
+                                type = TYPE_COMMIT;
+                            }else if (strcmp(argv[i + 1], "tag") == 0){
+                                type = TYPE_TAG;
+                            }else if (strcmp(argv[i + 1], "tree") == 0){
+                                type = TYPE_TREE;
+                            }else{
+                                fprintf(stderr, "usage:git_clone rev-parse [--git-clone-type TYPE] NAME\n");
+                                return 1;
+                            }
+                            i++;
+                            continue;
+                        }
+                    }
+                    fprintf(stderr, "usage:git_clone rev-parse [--git-clone-type TYPE] NAME\n");
+                    return 1;
+                }
+                name = argv[i];
+            }
+            return cmd_rev_parse(name, type);
+        }
+
+        fprintf(stderr, "usage:git_clone rev-parse [--git-clone-type TYPE] NAME\n");
         return 1;
     }
 
