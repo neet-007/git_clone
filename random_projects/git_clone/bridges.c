@@ -11,15 +11,15 @@ int cmd_init(char *path){
     return 0;
 }
 
-// fmt=""
-int cat_file(GitRepository *repo, char *object, char *fmt){
+// fmt=TYPE_NONE
+int cat_file(GitRepository *repo, char *object, GitObjectType fmt){
     char *path = object_find(repo, object, fmt, true);
     if (path == NULL){
         fprintf(stderr, "unable to find object %s path %s\n", object, path);
         return 1;
     }
 
-    GitObject *obj = object_read(repo, object);
+    GitObject *obj = object_read(repo, path);
     if (obj == NULL){
         fprintf(stderr, "unable to read object %s path %s\n", object, path);
         free(path);
@@ -44,10 +44,10 @@ int cat_file(GitRepository *repo, char *object, char *fmt){
 }
 
 // fmt=""
-int cmd_cat_file(char *object, char *fmt){
+int cmd_cat_file(char *object, GitObjectType fmt){
     GitRepository *repo = repo_find(".", true);
     if (repo == NULL){
-        fprintf(stderr, "repo is null %s %s\n", object, fmt);
+        fprintf(stderr, "repo is null %s %d\n", object, fmt);
         return 1;
     }
 
@@ -160,7 +160,7 @@ int cmd_log(char *commit){
 
     printf("digraph git_clone{\n");
     printf("  node[shape=rect]\n");
-    char *sha = object_find(repo, commit, "", true);
+    char *sha = object_find(repo, commit, TYPE_NONE, true);
     if (sha == NULL){
         fprintf(stderr, "unable to find commit %s\n", commit);
         free_repo(repo);
@@ -186,7 +186,7 @@ int cmd_log(char *commit){
 
 // r=false, prefix=""
 int ls_tree(GitRepository *repo, char *ref, bool r, char *prefix){
-    char *sha = object_find(repo, ref, "tree", true);
+    char *sha = object_find(repo, ref, TYPE_TREE, true);
     if (sha == NULL){
         fprintf(stderr, "uanble to find sha in ls_tree\n");
         return 1;
@@ -343,7 +343,7 @@ int cmd_checkout(char *commit, char *path){
         return 1;
     }
 
-    char *sha = object_find(repo, commit, "", true);
+    char *sha = object_find(repo, commit, TYPE_NONE, true);
     if (sha == NULL){
         fprintf(stderr, "unable to find object commit %s in cmd_checkout\n", commit);
         free_repo(repo);
@@ -568,7 +568,7 @@ int ref_create(GitRepository *repo, char *ref_name, char *sha){
 // create_tag_object=true
 int tag_create(GitRepository *repo, char *name, char *object, bool create_tag_object){
     int res = 0;
-    char *sha = object_find(repo, object, "", true);
+    char *sha = object_find(repo, object, TYPE_NONE, true);
     if (sha == NULL){
         fprintf(stderr, "unable to find object %s in tag_create\n", object);
         return 1;

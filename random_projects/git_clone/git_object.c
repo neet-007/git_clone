@@ -1,4 +1,6 @@
 #include "git_object.h"
+#include "dynamic_array.h"
+#include "refs.h"
 #include "tree_parser.h"
 
 char *git_object_serialize(GitObject *object, GitRepository *repo, size_t *data_size){
@@ -102,6 +104,10 @@ int git_object_deserialize(GitObject *object, void *data, size_t data_size){
             }
             break;
         }
+        case TYPE_NONE:{
+            fprintf(stderr, "object type is none in git_object_desirzile\n");
+            return 0;
+        }
     }
 
     return 1;
@@ -159,6 +165,10 @@ GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
             object->value = tree;
             break;
         }
+        case TYPE_NONE:{
+            fprintf(stderr, "object type is none in git_object_desirzile\n");
+            return 0;
+        }
     }
 
     if (git_object_deserialize(object, data, data_size) < 1){
@@ -175,7 +185,7 @@ GitObject *object_read(GitRepository *repo, char *sha){
     sha_dir[2] = '\0';
     char *path = repo_file(repo, false, 3, "objects", sha_dir, sha + 2);
     if (path == NULL){
-        fprintf(stderr, "repofile empty\n");
+        fprintf(stderr, "repofile empty sha_dir %s sha %s\n", sha_dir, sha + 2);
         return NULL;
     }
 
@@ -316,6 +326,10 @@ char *object_write(GitObject *object, GitRepository *repo){
             fmt = "tree";
             break;
         }
+        case TYPE_NONE:{
+            fprintf(stderr, "object type is none in git_object_desirzile\n");
+            return 0;
+        }
     }
     to_hash_len = strlen(fmt) + 1 + strlen(data_size_str) + 1 + data_size;
     to_hash = malloc(to_hash_len);
@@ -428,20 +442,100 @@ void free_git_object(GitObject *object){
             free(tree->items);
             break;
         }
+        case TYPE_NONE:{
+            fprintf(stderr, "object type is none in git_object_desirzile\n");
+            return;
+        }
     }
 
     free(object->value);
     free(object);
 }
 
-// fmt="", follow=true
-char *object_find(GitRepository *repo, char *name, char *fmt, bool follow){
+// fmt=NULL, follow=true
+char *object_find(GitRepository *repo, char *name, GitObjectType fmt, bool follow){
     char *ret = malloc(sizeof(char) * (strlen(name) + 1));
     if (ret == NULL){
         return NULL;
     }
 
     strcpy(ret, name);
+    DynamicArray *sha_array = object_resolve(repo, name);
+    if (sha_array == NULL){
+        fprintf(stderr, "unable to resolve object in object_find %s\n", name);
+        return NULL;
+    }
+
+    if (sha_array->count > 1){
+        fprintf(stderr, "Ambiguous reference in object_find %s\n", name);
+        free_dynamic_array(sha_array);
+        return NULL;
+    }
+
+    char *sha = ((char **)sha_array->elements)[0];
+    if (sha == NULL){
+        fprintf(stderr, "unable to get the sha in object_find %s\n", name);
+        free_dynamic_array(sha_array);
+        return NULL;
+    }
+
+    if (fmt == TYPE_NONE){
+        char *ret = strdup(sha);
+        free_dynamic_array(sha_array);
+        return ret;
+    }
+    GitObject *object = NULL;
+    GitTag *tag = NULL;
+    GitCommit *commit = NULL;
+    Ht_item *item = NULL;
+    DynamicArray *item_sha_array = NULL;
+    while(1){
+        object = object_read(repo, sha);
+        if (object == NULL){
+            fprintf(stderr, "unable to read object in object_find %s\n", sha);
+            free_dynamic_array(sha_array);
+            return NULL;
+        }
+
+        if (object->type == fmt){
+            char *ret = strdup(sha);
+            free_dynamic_array(sha_array);
+            return ret;
+        }
+
+        if (!follow){
+            free_dynamic_array(sha_array);
+            return NULL;
+        }
+
+        if (object->type == TYPE_TAG){
+            free(sha);
+            tag = object->value;
+            item = ht_search(tag->kvlm, "object");
+            if (item == NULL){
+                fprintf(stderr, "unable to find object key in object_find %s\n", sha);
+                free_dynamic_array(sha_array);
+                return NULL;
+            }
+            item_sha_array = item->value;
+            sha = (char *)(((char **)item_sha_array->elements)[0]);
+        }else if (object->type == TYPE_COMMIT){
+            free(sha);
+            commit = object->value;
+            item = ht_search(commit->kvlm, "tree");
+            if (item == NULL){
+                fprintf(stderr, "unable to find tree key in object_find %s\n", sha);
+                free_dynamic_array(sha_array);
+                return NULL;
+            }
+            item_sha_array = item->value;
+            sha = (char *)(((char **)item_sha_array->elements)[0]);
+        }else{
+            free_dynamic_array(sha_array);
+            return NULL;
+        }
+    }
+
     return ret;
 }
 
@@ -483,4 +577,126 @@ char *object_hash(FILE *f, char *fmt, GitRepository *repo){
     free(data);
 
     return sha;
+}
+
+DynamicArray *object_resolve(GitRepository *repo, char *name){
+    DynamicArray *ret = new_dynamic_array(TYPE_ARRAY_STR, 0);
+    char *curr = NULL;
+    char *path = NULL;
+    char sha_prefix[3];
+
+    if (ret == NULL){
+        fprintf(stderr, "unable to create new array in object_resolve\n");
+        return NULL;
+    }
+
+    const char *pattern = "^[0-9A-Fa-f]{4,40}$";
+
+    regex_t regex;
+    int res = regcomp(&regex, pattern, REG_EXTENDED);
+    if (res) {
+        fprintf(stderr, "Could not compile regex in object_resolve\n");
+        free_dynamic_array(ret);
+        regfree(&regex);
+        return NULL;
+    }
+
+    if (str_empty(name)){
+        free_dynamic_array(ret);
+        regfree(&regex);
+        return NULL;
+    }
+
+    if (strcmp(name, "HEAD") == 0){
+        curr = ref_resolver(repo, "HEAD");
+        if (curr == NULL){
+            fprintf(stderr, "unable to find HEAD in object_resolve\n");
+            free_dynamic_array(ret);
+            regfree(&regex);
+            return NULL;
+        }
+
+        regfree(&regex);
+        add_dynamic_array(ret, curr);
+        return ret;
+    }
+
+    if (regexec(&regex, name, 0, NULL, 0) == 0){
+        sha_prefix[0] = '\0';
+        strncpy(sha_prefix, name, 2);
+        to_lower(name);
+
+        path = repo_dir(repo, false, 2, "objects", sha_prefix);
+        if (path != NULL){
+            size_t i = 0;
+            size_t dir_size = 0;
+            char *rem = name + 2;
+            char *curr_file = NULL;
+            char *new_file = NULL;
+            char **dir = list_directory(path, &dir_size, false);
+            if (dir == NULL){
+                fprintf(stderr, "unable to list_directroy in object_resolve\n");
+                free_dynamic_array(ret);
+                free(path);
+                regfree(&regex);
+                return NULL;
+            }
+
+            while(i < dir_size){
+                curr_file = dir[i];
+                if (strncmp(curr_file, rem, strlen(rem)) == 0){
+                    new_file = malloc(sizeof(char) * (strlen(sha_prefix) + strlen(curr_file) + 1));
+                    if (new_file == NULL){
+                        fprintf(stderr, "unable to allocate memory for new_file in object_resolve\n");
+                        free_dynamic_array(ret);
+                        free(path);
+                        regfree(&regex);
+                        return NULL;
+                    }
+                    new_file[0] = '\0';
+                    strcpy(new_file, sha_prefix);
+                    strcpy(new_file + strlen(sha_prefix), curr_file);
+                    add_dynamic_array(ret, new_file);
+                }
+                i++;
+            }
+            i = 0;
+            while (i < dir_size){
+                free(dir[i++]);
+            }
+            free(dir);
+        }
+    }
+
+    char *ref_path = malloc(sizeof(char) * (strlen("refs/heads/") + strlen(name)));
+    if (ref_path == NULL){
+        fprintf(stderr, "unable to allocate memory for new_file in object_resolve\n");
+        free_dynamic_array(ret);
+        if (path != NULL){
+            free(path);
+        }
+        regfree(&regex);
+        return NULL;
+    }
+    ref_path[0] = '\0';
+    strcpy(ref_path, "refs/tags/");
+    strcpy(ref_path + strlen("refs/tags/"), name);
+    char *as_tag = ref_resolver(repo, ref_path);
+    if (as_tag != NULL){
+        add_dynamic_array(ret, as_tag);
+    }
+
+    strcpy(ref_path, "refs/heads/");
+    strcpy(ref_path + strlen("refs/heads/"), name);
+    char *as_branch = ref_resolver(repo, ref_path);
+    if (as_branch != NULL){
+        add_dynamic_array(ret, as_branch);
+    }
+
+    if (path){
+        free(path);
+    }
+    free(ref_path);
+    regfree(&regex);
+    return ret;
 }

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 typedef enum GitObjectType{
+    TYPE_NONE,
     TYPE_BLOB,
     TYPE_COMMIT,
     TYPE_TAG,

@@ -107,6 +107,7 @@ char *tree_serialize(GitTree *tree, size_t *data_size){
             tree->items[i]->path[strlen(tree->items[i]->path)-1] = '/';
             tree->items[i]->path[strlen(tree->items[i]->path)] = '\0';
         }
+        i++;
     }
 
     *data_size = (GIT_TREE_MODE_SIZE + 1 + 1 + GIT_SHA_SIZE) * tree->items_len;

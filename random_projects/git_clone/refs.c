@@ -2,14 +2,14 @@
 
 //WARNING: review this and see how it fits with other commands
 char *ref_resolver(GitRepository *repo, char *ref){
-    /*
     char *path = repo_file(repo, false, 1, ref);
     if (path == NULL){
         fprintf(stderr, "unalbe to file ref %s in ref_resolver\n", ref);
         return NULL;
     }
-    */
+    /*
     char *path = ref;
+    */
 
     if (!is_file(path)){
         //free(path);
@@ -46,7 +46,7 @@ char *ref_resolver(GitRepository *repo, char *ref){
     ref_str[ref_str_curr] = '\0';
     fclose(f);
 
-    if (strcmp(ref_str, "ref: ") == 0){
+    if (strncmp(ref_str, "ref: ", strlen("ref: ")) == 0){
         char * temp = ref_resolver(repo, ref_str + 5);
         free(ref_str);
         if (temp == NULL){
@@ -86,7 +86,7 @@ HashTable *ref_list(GitRepository *repo, char *path){
     char *curr_ref = NULL;
     char *curr = NULL;
     char *can = NULL;
-    char **dirs = list_directory_sorted(path, &dirs_count);
+    char **dirs = list_directory(path, &dirs_count, true);
     if (dirs == NULL){
         fprintf(stderr, "unable to list dirs for path %s in ref_list\n", path);
         if (free_path){

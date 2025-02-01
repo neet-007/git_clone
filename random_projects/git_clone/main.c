@@ -17,10 +17,23 @@ int main(int argc, char *argv[]){
     }
     if (strcmp(argv[1], "cat-file") == 0){
         if (argc == 4){
-            return cmd_cat_file(argv[3], argv[2]);
+            GitObjectType type;
+            if (strcmp(argv[2], "blob") == 0){
+                type = TYPE_BLOB;
+            }else if (strcmp(argv[2], "commit") == 0){
+                type = TYPE_COMMIT;
+            }else if (strcmp(argv[2], "tag") == 0){
+                type = TYPE_TAG;
+            }else if (strcmp(argv[2], "tree") == 0){
+                type = TYPE_TREE;
+            }else{
+                fprintf(stderr, "usage:git_clone cat-file TYPE OBJECT\n");
+                return 1;
+            }
+            return cmd_cat_file(argv[3], type);
         }
         if (argc == 3){
-            return cmd_cat_file(argv[2], "");
+            return cmd_cat_file(argv[2], TYPE_NONE);
         }
         fprintf(stderr, "usage:git_clone cat-file TYPE OBJECT\n");
         return 1;

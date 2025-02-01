@@ -384,7 +384,7 @@ int compare(const void *a, const void *b) {
     return strcmp(*(const char **)a, *(const char **)b);
 }
 
-char **list_directory_sorted(char *path, size_t *count) {
+char **list_directory(char *path, size_t *count, bool sort) {
     struct dirent *entry;
     DIR *dir = opendir(path);
     if (!dir) {
@@ -420,7 +420,31 @@ char **list_directory_sorted(char *path, size_t *count) {
 
     closedir(dir);
 
-    qsort(filenames, *count, sizeof(char *), compare);
+    if (sort){
+        qsort(filenames, *count, sizeof(char *), compare);
+    }
 
     return filenames;
+}
+
+bool str_empty(char *str){
+    bool empty = true;
+    size_t i = 0;
+    size_t len = strlen(str);
+
+    while(i < len){
+        if (!isspace(str[i])){
+            empty = false;
+            break;
+        }
+        i++;
+    }
+
+    return empty;
+}
+
+void to_lower(char *str){
+    for(int i = 0; str[i]; i++){
+        str[i] = tolower(str[i]);
+    }
 }
