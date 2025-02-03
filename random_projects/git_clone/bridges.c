@@ -796,3 +796,22 @@ int cmd_ls_files(bool verbose){
     free_repo(repo);
     return 0;
 }
+
+int cmd_check_ignore(size_t count, char **paths){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_check_ignore\n");
+        return 1;
+    }
+
+    int rules = gitignore_read(repo);
+    size_t i;
+    for (i = 0; i < count; i++){
+        if (check_ignore(rules, paths[i])){
+            printf("%s\n", paths[i]);
+        }
+    }
+
+    free_repo(repo);
+    return 0;
+}

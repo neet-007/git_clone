@@ -168,6 +168,9 @@ void free_item(Ht_item *item) {
             free_dynamic_array((DynamicArray *)item->value);
             break;
         }
+        case TYPE_GIT_IGNORE_ITEM:{
+            break;
+        }
         default:{
             perror("wrong type for item");
             free(item->key);
@@ -349,6 +352,9 @@ void print_item(Ht_item *item){
         case TYPE_ARRAY:{
             printf("key %s val:\n", item->key);
             print_dynamic_array((DynamicArray *)item->value);
+            break;
+        }
+        case TYPE_GIT_IGNORE_ITEM:{
             break;
         }
         default:{

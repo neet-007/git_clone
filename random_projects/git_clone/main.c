@@ -210,6 +210,14 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "usage:git_clone ls-files [--verbose]\n");
         return 1;
     }
+    if (strcmp(argv[1], "check-ignore") == 0){
+        if (argc < 3){
+            fprintf(stderr, "usage:git_clone check-ignore PATHS...\n");
+            return 1;
+        }
+
+        return cmd_check_ignore(argc - 2, argv + 2);
+    }
 
     return 0;
 }

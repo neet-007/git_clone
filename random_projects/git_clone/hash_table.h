@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "dynamic_array.h"
+#include "git_ignore_types.h"
 
 typedef enum {
     TYPE_BOOL,
@@ -14,6 +15,7 @@ typedef enum {
     TYPE_STR,
     TYPE_HASH_TABLE,
     TYPE_ARRAY,
+    TYPE_GIT_IGNORE_ITEM,
 } ValueType;
 
 typedef struct Ht_item{

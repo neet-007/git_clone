@@ -32,5 +32,8 @@ int find_char(char *raw, char c, int start, size_t raw_size);
 char **list_directory(char *path, size_t *count, bool sort);
 bool str_empty(char *str);
 void to_lower(char *str);
+bool ends_with(char *str, char *suffix);
+void dirname(char **path);
+char *read_line_from_raw(char **dest, char *raw, size_t *dest_size, size_t *start, size_t raw_size);
 
 #endif

@@ -448,3 +448,59 @@ void to_lower(char *str){
         str[i] = tolower(str[i]);
     }
 }
+
+bool ends_with(char *str, char *suffix) {
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+
+    if (suffix_len > str_len) {
+        return false;
+    }
+
+    return strcmp(str + str_len - suffix_len, suffix) == 0;
+}
+
+void dirname(char **path) {
+    char *last_slash = strrchr(*path, '/');
+
+    if (last_slash != NULL) {
+        *last_slash = '\0';
+    } else {
+        strcpy(*path, ".");
+    }
+}
+
+char *read_line_from_raw(char **dest, char *raw, size_t *dest_size, size_t *start, size_t raw_size) {
+    if (dest == NULL || *dest == NULL) {
+        *dest_size = 8;
+        *dest = malloc(*dest_size);
+        if (*dest == NULL) {
+            fprintf(stderr, "Memory allocation failed for dest\n");
+            return NULL;
+        }
+    }
+
+    size_t ret_len = 0;
+
+    while (*start < raw_size) {
+        if (ret_len >= *dest_size - 1) {
+            *dest_size *= 2;
+            char *new_dest = realloc(*dest, *dest_size);
+            if (new_dest == NULL) {
+                fprintf(stderr, "Memory reallocation failed\n");
+                free(*dest);
+                return NULL;
+            }
+            *dest = new_dest;
+        }
+
+        char c = raw[(*start)++];
+        if (c == '\n') break;
+
+        (*dest)[ret_len++] = c;
+    }
+
+    (*dest)[ret_len] = '\0';
+
+    return (ret_len == 0 && *start >= raw_size) ? NULL : *dest;
+}

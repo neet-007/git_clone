@@ -24,5 +24,6 @@ int cmd_show_ref();
 int cmd_git_tag(char *name, char *object, bool a);
 int cmd_rev_parse(char *name, GitObjectType type);
 int cmd_ls_files(bool verbose);
+int cmd_check_ignore(size_t count, char **paths);
 
 #endif
