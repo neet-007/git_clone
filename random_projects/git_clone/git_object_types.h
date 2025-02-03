@@ -4,9 +4,11 @@
 #define GIT_TREE_MODE_SIZE 6
 #define GIT_SHA_SIZE 41
 
+#include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
 #include "dynamic_array.h"
 #include "hash_table.h"
-#include <stdlib.h>
 
 typedef enum GitObjectType{
     TYPE_NONE,
@@ -45,5 +47,33 @@ typedef struct GitTree{
 typedef struct GitTag{
     HashTable *kvlm;
 } GitTag;
+
+typedef struct GitIndexEntry {
+    int ctime_sec;
+    int ctime_nsec;
+    int mtime_sec;
+    int mtime_nsec;
+    int dev;
+    int ino;
+    int mode;
+    int mode_type;
+    int mode_perms;
+    int uid;
+    int gid;
+    int fsize;
+    char sha[GIT_SHA_SIZE];
+    int flags;
+    int flag_assume_valid;
+    int flag_extended;
+    int flag_stage;
+    char *name;
+} GitIndexEntry;
+
+typedef struct GitIndex {
+    uint32_t signature;
+    uint32_t version;
+    uint32_t entries_count;
+    GitIndexEntry **entries;
+} GitIndex;
 
 #endif

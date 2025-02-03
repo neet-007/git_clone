@@ -197,6 +197,19 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "usage:git_clone rev-parse [--git-clone-type TYPE] NAME\n");
         return 1;
     }
+    if (strcmp(argv[1], "ls-files") == 0){
+        if (argc == 2){
+            return cmd_ls_files(false);
+        }
+        if (argc == 3){
+            if (strcmp(argv[2], "--verbose") == 0){
+                return cmd_ls_files(true);
+            }
+        }
+
+        fprintf(stderr, "usage:git_clone ls-files [--verbose]\n");
+        return 1;
+    }
 
     return 0;
 }

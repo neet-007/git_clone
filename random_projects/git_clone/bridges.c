@@ -704,5 +704,95 @@ int cmd_rev_parse(char *name, GitObjectType type){
     free_repo(repo);
 
     printf("%s\n", res);
+    free(res);
+    return 0;
+}
+
+int cmd_ls_files(bool verbose){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_ls_files\n");
+        return 1;
+    }
+
+    GitIndex *index = read_index(repo);
+    if (index == NULL){
+        fprintf(stderr, "unable to read index in cmd_ls_files\n");
+        free_repo(repo);
+        return 1;
+    }
+
+    GitIndexEntry *curr;
+    char *entry_type = NULL;
+    time_t time = 0;
+    struct tm *time_info = NULL;
+    char formatted_time[120];
+    char formatted_time_1[120];
+    struct passwd *pw;
+    struct group *gr;
+    size_t i;
+    for (i = 0; i < index->entries_count; i++){
+        curr = index->entries[i];
+        printf("%s\n", curr->name);
+        if (verbose){
+            switch (curr->mode_type) {
+                case 0b1000:{
+                    entry_type = "regular file";
+                    break;
+                }
+                case 0b1010:{
+                    entry_type = "sym link";
+                    break;
+                }
+                case 0b1110:{
+                    entry_type = "git link";
+                    break;
+                }
+                default:{
+                    fprintf(stderr ,"invalid file mode %d\n", curr->mode_type);
+                    break;
+                }
+            }
+            printf("  %s with perms: %o\n", entry_type, curr->mode_perms);
+            printf("  on blob: %s\n", curr->sha);
+            time = curr->ctime_sec;
+            time_info = localtime(&time);
+            if (time_info == NULL) {
+                perror("Failed to convert timestamp");
+                continue;
+            }
+            strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %H:%M:%S", time_info);
+            snprintf(formatted_time + strlen(formatted_time), sizeof(formatted_time) - strlen(formatted_time), ".%09d", curr->ctime_nsec);
+            time = curr->mtime_sec;
+            time_info = localtime(&time);
+            if (time_info == NULL) {
+                perror("Failed to convert timestamp");
+                continue;
+            }
+            strftime(formatted_time_1, sizeof(formatted_time_1), "%Y-%m-%d %H:%M:%S", time_info);
+            snprintf(formatted_time_1 + strlen(formatted_time_1), sizeof(formatted_time_1) - strlen(formatted_time_1), ".%09d", curr->mtime_nsec);
+            printf("  created: %s, modified: %s\n", formatted_time, formatted_time_1);
+            printf("  device: %d, inode: %d\n", curr->dev, curr->ino);
+            pw = getpwuid(curr->uid);
+            if (!pw) {
+                perror("getpwuid failed");
+                continue;
+            } 
+            gr = getgrgid(curr->gid);
+            if (!gr) {
+                perror("getgrgid failed");
+                continue;
+            }
+            printf("  user: %s %d  group: %s %d\n", pw->pw_name, curr->uid, gr->gr_name, curr->gid);
+            printf("  flags: stage= %d assume_valid= %d\n", curr->flag_stage, curr->flag_assume_valid);
+        }
+
+        free(curr->name);
+        free(curr);
+    }
+    free(index->entries);
+    free(index);
+
+    free_repo(repo);
     return 0;
 }
