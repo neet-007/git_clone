@@ -804,14 +804,28 @@ int cmd_check_ignore(size_t count, char **paths){
         return 1;
     }
 
-    int rules = gitignore_read(repo);
+    GitIgnore *rules = git_ignore_read(repo);
     size_t i;
     for (i = 0; i < count; i++){
-        if (check_ignore(rules, paths[i])){
+        if (check_ignore(rules, paths[i]) == 1){
             printf("%s\n", paths[i]);
         }
     }
 
+    size_t j;
+    for (i = 0; i < rules->absolute_len; i++){
+        for (j = 0; j < rules->absolute[i]->len; j++){
+            GitIgnoreItem *curr = rules->absolute[i]->items[j];
+            free(curr->path);
+            free(curr);
+        }
+        free(rules->absolute[i]->items);
+        free(rules->absolute[i]);
+    }
+
+    free(rules->absolute);
+    free_table(rules->scoped);
+    free(rules);
     free_repo(repo);
     return 0;
 }

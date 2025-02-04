@@ -116,6 +116,7 @@ int git_object_deserialize(GitObject *object, void *data, size_t data_size){
 GitObject *new_git_object(GitObjectType type, char *data, size_t data_size){
     GitObject *object = malloc(sizeof(GitObject));
     if (object == NULL){
+        fprintf(stderr, "unable to allocate memory for objet in new_git_object\n");
         return NULL;
     }
 

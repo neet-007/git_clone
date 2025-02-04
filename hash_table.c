@@ -169,6 +169,13 @@ void free_item(Ht_item *item) {
             break;
         }
         case TYPE_GIT_IGNORE_ITEM:{
+            GitIgnoreItems *curr = item->value;
+            for (size_t i = 0; i < curr->len; i++){
+                free(curr->items[i]->path);
+                free(curr->items[i]);
+            }
+            free(curr->items);
+            free(curr);
             break;
         }
         default:{

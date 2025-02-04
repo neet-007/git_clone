@@ -34,6 +34,7 @@ bool str_empty(char *str);
 void to_lower(char *str);
 bool ends_with(char *str, char *suffix);
 void dirname(char **path);
+char *dirname_copy(char *path);
 char *read_line_from_raw(char **dest, char *raw, size_t *dest_size, size_t *start, size_t raw_size);
 
 #endif

@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "refs.h"
 #include "git_index.h"
+#include "git_ignore.h"
 
 int cmd_init(char *path);
 int cat_file(GitRepository *repo, char *object, GitObjectType fmt);

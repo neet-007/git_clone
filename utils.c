@@ -470,6 +470,18 @@ void dirname(char **path) {
     }
 }
 
+char *dirname_copy(char *path){
+    char *parent = strdup(path);
+    if (path == NULL){
+        fprintf(stderr, "unable to dup path %s in dirname_copy\n", path);
+        return NULL;
+    }
+
+    dirname(&parent);
+
+    return parent;
+}
+
 char *read_line_from_raw(char **dest, char *raw, size_t *dest_size, size_t *start, size_t raw_size) {
     if (dest == NULL || *dest == NULL) {
         *dest_size = 8;

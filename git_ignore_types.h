@@ -10,4 +10,3 @@ typedef struct GitIgnoreItems{
     size_t len;
     GitIgnoreItem **items;
 } GitIgnoreItems;
-
