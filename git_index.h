@@ -13,5 +13,6 @@
 
 void read_git_index(char *filename);
 GitIndex *read_index(GitRepository *repo);
+void write_index(GitRepository *repo, GitIndex *index);
 
 #endif

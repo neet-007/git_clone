@@ -1118,3 +1118,84 @@ int cmd_status(){
 
     return 0;
 }
+
+// delete=true skip_missing=false
+int rm(GitRepository *repo, int count, char **paths, bool delete, bool skip_missing){
+    GitIndex *index = read_index(repo);
+    if (index == NULL){
+        fprintf(stderr, "unable to read index in rm\n");
+        return 1;
+    }
+
+    HashTable *abs_paths = create_table(CAPACITY);
+    if (abs_paths == NULL){
+        fprintf(stderr, "unable to create table in rm\n");
+        return 1;
+    }
+
+    size_t i;
+    char *abs_path = NULL;
+    bool dummy = true;
+    for (i = 0; i < count; i++){
+        abs_path = realpath(paths[i], abs_path);
+        if (strncmp(abs_path, repo->worktree, strlen(repo->worktree)) == 0){
+            ht_insert(abs_paths, abs_path, &dummy, sizeof(bool), TYPE_BOOL);
+        }else{
+            fprintf(stderr, "%s 1Cannot remove paths outside of worktree: %s",repo->worktree, abs_path);
+            return 1;
+        }
+        free(abs_path);
+        abs_path = NULL;
+    }
+
+    size_t kept_len = 0;
+    GitIndexEntry **kept_entries = malloc(sizeof(GitIndexEntry *) * index->entries_count);
+    DynamicArray *remove = new_dynamic_array(TYPE_ARRAY_STR, 0);
+
+    Ht_item *item = NULL;
+    GitIndexEntry *entry = NULL;
+    char *full_path = NULL;
+
+    for (i = 0; i < index->entries_count; i++){
+        entry = index->entries[i];
+        full_path = join_path(repo->worktree, 1, entry->name);
+
+        item = ht_search(abs_paths, full_path);
+        if (item != NULL){
+            add_dynamic_array(remove, full_path);
+            ht_delete(abs_paths, full_path);
+        }else{
+            kept_entries[kept_len++] = entry;
+        }
+    }
+
+    if (abs_paths->count > 0 && !skip_missing){
+        fprintf(stderr, "2Cannot remove paths outside of worktree: %s", abs_path);
+        return 1;
+    }
+
+    if (delete){
+        char **array_str = remove->elements;
+        for (i = 0; i < remove->count; i++){
+            printf("unlik %s\n", array_str[i]);
+            unlink(array_str[i]);
+        }
+    }
+
+    free(index->entries);
+    index->entries = kept_entries;
+    index->entries_count = kept_len;
+
+    write_index(repo, index);
+    return 0;
+}
+
+int cmd_rm(int count, char **paths){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_rm\n");
+        return 1;
+    }
+
+    return rm(repo, count, paths, true, false);
+}

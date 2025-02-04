@@ -345,3 +345,136 @@ void read_git_index(char *filename) {
     munmap(data, file_size);
     close(fd);
 }
+
+void int_to_big_endian(int value, char *buffer, size_t size) {
+    for (size_t i = 0; i < size; i++) {
+        buffer[size - 1 - i] = (value >> (i * 8)) & 0xFF;
+    }
+}
+
+void int_to_2bytes_big_endian(uint16_t num, uint8_t *byte_array) {
+    byte_array[0] = (num >> 8) & 0xFF; // Most significant byte
+    byte_array[1] = num & 0xFF;        // Least significant byte
+}
+
+void int_to_4bytes_big_endian(uint32_t num, uint8_t *byte_array) {
+    byte_array[0] = (num >> 24) & 0xFF; // Most significant byte
+    byte_array[1] = (num >> 16) & 0xFF;
+    byte_array[2] = (num >> 8)  & 0xFF;
+    byte_array[3] = num & 0xFF;         // Least significant byte
+}
+
+void int_to_1byte(uint8_t num, uint8_t *byte_array) {
+    byte_array[0] = num & 0xFF; // Only 1 byte is needed
+}
+
+uint8_t hex_char_to_int(char c) {
+    if (isdigit(c)) return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return 0;
+}
+
+void write_index(GitRepository *repo, GitIndex *index){
+#define WRITE_INT_2_BYTES(value) \
+    int_to_2bytes_big_endian((value), buf_2_bytes);\
+    fwrite(buf_2_bytes, sizeof(char), 2, f);\
+
+#define WRITE_INT_4_BYTES(value) \
+    int_to_4bytes_big_endian((value), buf_4_bytes);\
+    fwrite(buf_4_bytes, sizeof(char), 4, f);\
+
+#define WRITE_INT_20_BYTES(value) \
+    int_to_big_endian((value), buf_20_bytes, sizeof(buf_4_bytes));\
+    fwrite(buf_20_bytes, sizeof(char), 20, f);\
+
+    char *index_path = repo_file(repo, false, 1, "index");
+    if (index_path == NULL){
+        fprintf(stderr, "unable to find index path in write_index\n");
+        return;
+    }
+
+    FILE *f = fopen(index_path, "wb");
+    if (f == NULL){
+        fprintf(stderr, "unable to open file %s in write_index\n", index_path);
+        free(index_path);
+        return;
+    }
+
+    uint8_t buf_1_bytes[1];
+    uint8_t buf_2_bytes[2];
+    uint8_t buf_4_bytes[4];
+    uint8_t buf_20_bytes[20];
+    fwrite("DIRC", sizeof(char), 4, f);
+    WRITE_INT_4_BYTES(index->version);
+    WRITE_INT_4_BYTES(index->entries_count);
+
+    int mode;
+    int flag_assumed_valid;
+    int bytes_len;
+    int name_length;
+    int pad;
+    size_t pad_size = 8;
+    char *buf_pad = malloc(sizeof(char) * pad_size);
+    size_t idx = 0;
+    size_t i;
+    GitIndexEntry *entry = NULL;
+
+    for (i = 0; i < index->entries_count; i++){
+        entry = index->entries[i];
+        WRITE_INT_4_BYTES(entry->ctime_sec);
+        WRITE_INT_4_BYTES(entry->ctime_nsec);
+        WRITE_INT_4_BYTES(entry->mtime_sec);
+        WRITE_INT_4_BYTES(entry->mtime_nsec);
+        WRITE_INT_4_BYTES(entry->dev);
+        WRITE_INT_4_BYTES(entry->ino);
+
+        mode = (entry->mode_type << 12) | entry->mode_perms;
+        WRITE_INT_4_BYTES(mode);
+
+        WRITE_INT_4_BYTES(entry->uid);
+        WRITE_INT_4_BYTES(entry->gid);
+
+        WRITE_INT_4_BYTES(entry->fsize);
+
+        for (size_t i = 0; i < 20; i++) {
+            sscanf(entry->sha+ 2 * i, "%2hhx", &buf_20_bytes[i]);
+        }
+
+        fwrite(buf_20_bytes, sizeof(uint8_t), 20, f);
+
+        flag_assumed_valid = entry->flag_assume_valid ? 0x1 << 15 : 0;
+        bytes_len = strlen(entry->name);
+
+        if (bytes_len >= 0xFFF){
+            name_length = 0xFFF;
+        }else{
+            name_length = bytes_len;
+        }
+
+        WRITE_INT_2_BYTES(flag_assumed_valid | entry->flag_stage | name_length);
+
+        fwrite(entry->name, sizeof(char), strlen(entry->name), f);
+        int_to_1byte(0, buf_1_bytes);
+        fwrite(buf_1_bytes, sizeof(char), 1, f);
+
+        idx += 62 + strlen(entry->name) + 1;
+
+        if (idx % 8 != 0){
+            pad = 8 - (idx % 8);
+            for (size_t j = 0; j < pad; j++){
+                if (pad > pad_size){
+                    pad_size = pad * 2;
+                    buf_pad = realloc(buf_pad, sizeof(char) * pad_size);
+                }
+                int_to_big_endian(0, buf_pad, pad);
+                fwrite(buf_pad, sizeof(char), pad, f);
+            }
+            idx += pad;
+        } 
+    }
+
+#undef WRITE_INT_2_BYTES
+#undef WRITE_INT_4_BYTES
+#undef WRITE_INT_20_BYTES
+}

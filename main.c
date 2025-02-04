@@ -226,6 +226,14 @@ int main(int argc, char *argv[]){
 
         return cmd_status();
     }
+    if (strcmp(argv[1], "rm") == 0){
+        if (argc != 3){
+            fprintf(stderr, "usage:git_clone rm PATH\n");
+            return 1;
+        }
+
+        return cmd_rm(argc - 2, argv + 2);
+    }
 
     return 0;
 }
