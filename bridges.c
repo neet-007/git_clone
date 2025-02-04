@@ -797,6 +797,7 @@ int cmd_ls_files(bool verbose){
     return 0;
 }
 
+//TODO: fix memory leaks
 int cmd_check_ignore(size_t count, char **paths){
     GitRepository *repo = repo_find(".", true);
     if (repo == NULL){
@@ -827,5 +828,293 @@ int cmd_check_ignore(size_t count, char **paths){
     free_table(rules->scoped);
     free(rules);
     free_repo(repo);
+    return 0;
+}
+
+char *get_active_branch(GitRepository *repo){
+    char *path = repo_file(repo, false, 1, "HEAD");
+    if (path == NULL){
+        fprintf(stderr, "unable to get path for HEAD in get_active_branch\n");
+        return NULL;
+    }
+
+    FILE *f = fopen(path, "r");
+    if (f == NULL){
+        fprintf(stderr, "unable to open file %s in get_active_branch\n", path);
+        free(path);
+        return NULL;
+    }
+
+    size_t size = 0;
+    char *content = file_read_all(f, &size);
+    if (content == NULL){
+        fprintf(stderr, "unable to read file content %s in get_active_branch\n", path);
+        free(path);
+        fclose(f);
+        return NULL;
+    }
+    fclose(f);
+
+    size_t len = strlen("ref: refs/heads/");
+    if (strncmp(content, "ref: refs/heads/", len) == 0){
+        char *ret = malloc(sizeof(char) * (size - len + 1));
+        if (ret == NULL){
+            fprintf(stderr, "unalbe to allocate memory for ret str in get_active_bransh\n");
+            free(path);
+            free(content);
+            return NULL;
+        }
+        ret[0] = '\0';
+        strncpy(ret, content, size - len);
+        ret[size - len] = '\0';
+        free(content);
+        free(path);
+        return ret;
+    }
+
+    free(content);
+    free(path);
+    return NULL;
+}
+
+void cmd_status_branch(GitRepository *repo){
+    char *branch = get_active_branch(repo);
+    if (branch == NULL){
+        char *sha = object_find(repo, "HEAD", TYPE_NONE, true);
+        if (sha== NULL){
+            fprintf(stderr, "unable to object find HEAD in cmd_status_branch\n");
+            return;
+        }
+        printf("HEAD detached at %s", sha);
+        free(sha);
+        return;
+    }
+
+    printf("On branch %s\n", branch);
+    free(branch);
+}
+
+// prefix=""
+int tree_to_ht(GitRepository *repo, char *ref, char *prefix, HashTable *table){
+    char *tree_sha = object_find(repo, ref, TYPE_TREE, true);
+    if (tree_sha == NULL){
+        fprintf(stderr, "unable to object find tree %s in tree_to_ht\n", ref);
+        return 0;
+    }
+
+    GitObject *tree_object = object_read(repo, tree_sha);
+    if (tree_object == NULL || tree_object->type != TYPE_TREE){
+        fprintf(stderr, "unable to object read tree %s %s in tree_to_ht\n", tree_sha, ref);
+        free(tree_sha);
+        return 0;
+    }
+
+    free(tree_sha);
+    GitTree *tree = tree_object->value;
+    GitTreeLeaf *curr = NULL;
+    char *full_path = NULL;
+
+    size_t i;
+    for (i = 0; i < tree->items_len; i++){
+        curr = tree->items[i];
+
+        full_path = join_path(prefix, 1, curr->path);
+
+        if (strcmp(curr->mode, "04") == 0){
+            tree_to_ht(repo, curr->sha, full_path, table);
+        }else{
+            ht_insert(table, full_path, curr->sha, sizeof(char) * 41, TYPE_STR);
+        }
+
+        free(full_path);
+    }
+
+    free_git_object(tree_object);
+    return 1;
+}
+
+void cmd_status_head_index(GitRepository *repo, GitIndex *index){
+    printf("Changes to be committed:\n");
+
+    HashTable *head = create_table(CAPACITY);
+    if (head == NULL){
+        fprintf(stderr, "unable to create table for HEAD in cmd_status_head_index\n");
+        return;
+    }
+
+    tree_to_ht(repo, "HEAD", "", head);
+    Ht_item *item = NULL;
+    GitIndexEntry *entry = NULL;
+
+    size_t i;
+    for (i = 0; i < index->entries_count; i++){
+        entry = index->entries[i];
+        item = ht_search(head, entry->name);
+        if (item != NULL){
+            if (strcmp((char *)item->value, entry->sha) != 0){
+                printf("    modified:%s\n", entry->name);
+            }
+            ht_delete(head, entry->name);
+        }else{
+            printf("    added:  %s\n", entry->name);
+        }
+    }
+
+    char **keys = head->keys->elements;
+    for (i = 0; i < head->keys->count; i++){
+        printf("    deleted: %s\n", keys[i]);
+    }
+
+    free_table(head);
+}
+
+void walk_work_tree(char *path, DynamicArray *array, char *gitdir, char *gitdir_prefix, char *work_tree){
+    struct dirent *entry;
+    DIR *dir = opendir(path);
+
+    if (dir == NULL) {
+        perror("opendir");
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        char path_[1024];
+        struct stat statbuf;
+
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, gitdir) == 0 || strncmp(entry->d_name, gitdir_prefix, strlen(gitdir_prefix))) {
+            continue;
+        }
+
+        snprintf(path_, sizeof(path_), "%s/%s", path, entry->d_name);
+        path[strlen(path) + strlen(entry->d_name)] = '\0';
+
+        if (stat(path_, &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) {
+            walk_work_tree(path_, array, gitdir, gitdir_prefix, work_tree);
+        } else {
+            char *full_path = join_path(path_, 1, entry->d_name);
+            char *real_path = relpath(full_path, work_tree);
+            add_dynamic_array(array, real_path);
+        }
+    }
+
+    closedir(dir);
+
+}
+
+void cmd_status_index_worktree(GitRepository *repo, GitIndex *index){
+    DynamicArray *files = new_dynamic_array(TYPE_ARRAY_STR, 0);
+
+    printf("Changes not staged for commit:\n");
+
+    char *gitdir_prefix = malloc(sizeof(char) * (strlen(repo->gitdir) + 2));
+    gitdir_prefix[0] = '\0';
+
+    strcpy(gitdir_prefix, repo->gitdir);
+    gitdir_prefix[strlen(repo->gitdir)] = '/';
+    gitdir_prefix[strlen(repo->gitdir) + 1] = '\0';
+
+    walk_work_tree(repo->worktree, files, repo->gitdir, gitdir_prefix, repo->worktree);
+    free(gitdir_prefix);
+
+    size_t i;
+    GitIndexEntry *entry = NULL;
+    char *full_path = NULL;
+    int idx;
+    FILE *f = NULL;
+    uint64_t file_ctime_ns;
+    uint64_t file_mtime_ns;
+    char *new_hash = NULL;
+    struct stat file_stat;
+
+    for (i = 0; i < index->entries_count; i++){
+        entry = index->entries[i];
+        full_path = join_path(repo->worktree, 1, entry->name);
+        if (full_path == NULL){
+            fprintf(stderr, "unable to join paths %s, %s in cmd_status_worktree\n", repo->worktree, entry->name);
+            free_dynamic_array(files);
+            return;
+        }
+
+        if (!PATH_EXISTS(full_path)){
+            printf("    deleted: %s\n", entry->name);
+        }else{
+            if (stat(full_path, &file_stat) != 0) {
+                fprintf(stderr, "unable to get stats %s in cmd_status_worktree\n", full_path);
+                free(full_path);
+                free_dynamic_array(files);
+                return;
+            }
+
+            file_ctime_ns = (uint64_t)file_stat.st_ctim.tv_sec * 1000000000L + file_stat.st_ctim.tv_nsec;
+            file_mtime_ns = (uint64_t)file_stat.st_mtim.tv_sec * 1000000000L + file_stat.st_mtim.tv_nsec;
+
+            if (file_ctime_ns != (entry->ctime_sec * 1000000000L + entry->ctime_nsec) || file_mtime_ns != (entry->mtime_sec * 1000000000L + entry->mtime_nsec)) {
+                f = fopen(full_path, "rb");
+                if (f == NULL){
+                    fprintf(stderr, "unable open file %s in cmd_status_worktree\n", full_path);
+                    free(full_path);
+                    free_dynamic_array(files);
+                    return;
+                }
+                char *new_hash = object_hash(f, "blob", NULL);
+                if (new_hash == NULL){
+                    fprintf(stderr, "unable to hash object %s in cmd_status_worktree\n", full_path);
+                    free(full_path);
+                    free_dynamic_array(files);
+                    fclose(f);
+                    return;
+                }
+
+                if (strcmp(new_hash, entry->sha) != 0){
+                    printf("    modified: %s\n", entry->name);
+                }
+                free(new_hash);
+                fclose(f);
+            }
+        }
+        free(full_path);
+
+        if ((idx = index_of_dynamic_array(files, entry->name)) != -1){
+            remove_dynamic_array(files, idx);
+        }
+    }
+
+    char **files_chars = files->elements;
+    printf("\nUntracked files:\n");
+    for (i = 0; i < files->count; i++){
+        printf(" %s\n", files_chars[i]);
+    }
+
+    free_dynamic_array(files);
+}
+
+int cmd_status(){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo\n");
+        return 1;
+    }
+
+    GitIndex *index = read_index(repo);
+    if (index == NULL){
+        fprintf(stderr, "unable to read index\n");
+        free_repo(repo);
+        return 1;
+    }
+
+    cmd_status_branch(repo);
+    cmd_status_head_index(repo, index);
+    printf("\n");
+    cmd_status_index_worktree(repo, index);
+
+    free_repo(repo);
+
+    for (size_t i = 0; i < index->entries_count; i++){
+        free(index->entries[i]->name);
+        free(index->entries[i]);
+    }
+    free(index->entries);
+    free(index);
+
     return 0;
 }

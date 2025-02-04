@@ -137,6 +137,7 @@ int remove_dynamic_array_by_value(DynamicArray *array, void *value){
             for (i = 0; i < array->count; i++){
                 if (elements[i] == (*(int *)value)){
                     idx = i;
+                    break;
                 }
             }
             if (i == array->count){
@@ -154,10 +155,11 @@ int remove_dynamic_array_by_value(DynamicArray *array, void *value){
             for (i = 0; i < array->count; i++){
                 if (strcmp(elements[i], (char *)value) == 0){
                     idx = i;
+                    break;
                 }
             }
             if (i == array->count){
-                fprintf(stderr, "could not find value in array %d\n", (* (int *)value));
+                fprintf(stderr, "could not find value in array %s\n", (char *)value);
                 return -1;
             }
 
@@ -172,6 +174,7 @@ int remove_dynamic_array_by_value(DynamicArray *array, void *value){
         }
     }
 
+    array->count--;
     return 1;
 }
 

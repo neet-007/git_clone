@@ -38,7 +38,7 @@ char *ref_resolver(GitRepository *repo, char *ref){
         //free(path);
         return NULL;
     }
-    //free(path);
+    free(path);
 
     while(ref_str_curr < ref_str_size - 1){
         ref_str[ref_str_curr++] = fgetc(f);

@@ -14,6 +14,7 @@
 #include <ctype.h> 
 #include <zlib.h>
 #include <openssl/sha.h> 
+#include <limits.h>
 
 char *join_path_(char *path, unsigned int count, va_list va_a);
 char *join_path(char *path, unsigned int count, ...);
@@ -36,5 +37,6 @@ bool ends_with(char *str, char *suffix);
 void dirname(char **path);
 char *dirname_copy(char *path);
 char *read_line_from_raw(char **dest, char *raw, size_t *dest_size, size_t *start, size_t raw_size);
+char *relpath(char *full_path, char *base_path);
 
 #endif

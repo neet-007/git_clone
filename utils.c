@@ -516,3 +516,24 @@ char *read_line_from_raw(char **dest, char *raw, size_t *dest_size, size_t *star
 
     return (ret_len == 0 && *start >= raw_size) ? NULL : *dest;
 }
+
+char *relpath(char *full_path, char *base_path) {
+    char abs_full[PATH_MAX], abs_base[PATH_MAX];
+
+    if (realpath(full_path, abs_full) == NULL || realpath(base_path, abs_base) == NULL) {
+        perror("realpath");
+        return NULL;
+    }
+
+    size_t base_len = strlen(abs_base);
+    if (strncmp(abs_full, abs_base, base_len) != 0) {
+        fprintf(stderr, "Paths are unrelated.\n");
+        return NULL;
+    }
+
+    const char *relative_part = abs_full + base_len;
+    if (*relative_part == '/') relative_part++;
+
+    char *result = strdup(relative_part);
+    return result;
+}

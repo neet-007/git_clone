@@ -218,6 +218,14 @@ int main(int argc, char *argv[]){
 
         return cmd_check_ignore(argc - 2, argv + 2);
     }
+    if (strcmp(argv[1], "status") == 0){
+        if (argc != 2){
+            fprintf(stderr, "usage:git_clone status\n");
+            return 1;
+        }
+
+        return cmd_status();
+    }
 
     return 0;
 }

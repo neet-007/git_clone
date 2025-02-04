@@ -453,14 +453,8 @@ void free_git_object(GitObject *object){
     free(object);
 }
 
-// fmt=NULL, follow=true
+// fmt=TYPE_NONE, follow=true
 char *object_find(GitRepository *repo, char *name, GitObjectType fmt, bool follow){
-    char *ret = malloc(sizeof(char) * (strlen(name) + 1));
-    if (ret == NULL){
-        return NULL;
-    }
-
-    strcpy(ret, name);
     DynamicArray *sha_array = object_resolve(repo, name);
     if (sha_array == NULL){
         fprintf(stderr, "unable to resolve object in object_find %s\n", name);
@@ -491,6 +485,10 @@ char *object_find(GitRepository *repo, char *name, GitObjectType fmt, bool follo
     Ht_item *item = NULL;
     DynamicArray *item_sha_array = NULL;
     while(1){
+        if (object != NULL){
+            free_git_object(object);
+            object = NULL;
+        }
         object = object_read(repo, sha);
         if (object == NULL){
             fprintf(stderr, "unable to read object in object_find %s\n", sha);
@@ -499,45 +497,48 @@ char *object_find(GitRepository *repo, char *name, GitObjectType fmt, bool follo
         }
 
         if (object->type == fmt){
-            char *ret = strdup(sha);
             free_dynamic_array(sha_array);
-            return ret;
+            free_git_object(object);
+            return sha;
         }
 
         if (!follow){
             free_dynamic_array(sha_array);
+            free_git_object(object);
             return NULL;
         }
 
         if (object->type == TYPE_TAG){
-            free(sha);
             tag = object->value;
             item = ht_search(tag->kvlm, "object");
             if (item == NULL){
                 fprintf(stderr, "unable to find object key in object_find %s\n", sha);
                 free_dynamic_array(sha_array);
+                free_git_object(object);
                 return NULL;
             }
             item_sha_array = item->value;
-            sha = (char *)(((char **)item_sha_array->elements)[0]);
+            sha = strdup((char *)(((char **)item_sha_array->elements)[0]));
         }else if (object->type == TYPE_COMMIT){
-            free(sha);
             commit = object->value;
             item = ht_search(commit->kvlm, "tree");
             if (item == NULL){
                 fprintf(stderr, "unable to find tree key in object_find %s\n", sha);
                 free_dynamic_array(sha_array);
+                free_git_object(object);
                 return NULL;
             }
             item_sha_array = item->value;
-            sha = (char *)(((char **)item_sha_array->elements)[0]);
+            sha = strdup((char *)(((char **)item_sha_array->elements)[0]));
         }else{
             free_dynamic_array(sha_array);
+            free_git_object(object);
             return NULL;
         }
     }
 
-    return ret;
+    free_dynamic_array(sha_array);
+    free_git_object(object);
 }
 
 // repo=NULL
@@ -619,6 +620,7 @@ DynamicArray *object_resolve(GitRepository *repo, char *name){
 
         regfree(&regex);
         add_dynamic_array(ret, curr);
+        free(curr);
         return ret;
     }
 
@@ -666,6 +668,8 @@ DynamicArray *object_resolve(GitRepository *repo, char *name){
                 free(dir[i++]);
             }
             free(dir);
+            free(path);
+            path = NULL;
         }
     }
 
