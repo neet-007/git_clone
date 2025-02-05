@@ -1197,5 +1197,108 @@ int cmd_rm(int count, char **paths){
         return 1;
     }
 
-    return rm(repo, count, paths, true, false);
+    return rm(repo, count, paths, false, false);
+}
+
+
+// delete=true skip_missing=false
+int add(GitRepository *repo, int count, char **paths, bool delete, bool skip_missing){
+    rm(repo, count, paths, false, true);
+
+    HashTable *clean_paths = create_table(CAPACITY);
+    if (clean_paths == NULL){
+        fprintf(stderr, "unable to create table in add\n");
+        return 1;
+    }
+
+    size_t i;
+    char *abs_path = NULL;
+    char *rel_path = NULL;
+    for (i = 0; i < count; i++){
+        abs_path = realpath(paths[i], abs_path);
+        if (strncmp(abs_path, repo->worktree, strlen(repo->worktree)) == 0 && is_file(abs_path)){
+            rel_path = relpath(abs_path, repo->worktree);
+            ht_insert(clean_paths, abs_path, rel_path, strlen(rel_path) + 1, TYPE_STR);
+            free(rel_path);
+            rel_path = NULL;
+        }else{
+            fprintf(stderr, "%s 1Cannot remove paths outside of worktree: %s",repo->worktree, abs_path);
+            return 1;
+        }
+        free(abs_path);
+        abs_path = NULL;
+    }
+
+    GitIndex *index= read_index(repo);
+    if (index == NULL){
+        fprintf(stderr, "unable to read index in add\n");
+        return 1;
+    }
+
+    char *sha = NULL;
+    FILE *f = NULL;
+    Ht_item *item = NULL;
+    GitIndexEntry *entry = NULL;
+    struct stat st;
+    char **abs_paths = clean_paths->keys->elements;
+
+    uint32_t old_count = index->entries_count;
+    index->entries_count += clean_paths->keys->count;
+
+    index->entries = realloc(index->entries, sizeof(GitIndexEntry *) * index->entries_count);
+
+    for (i = 0; i < clean_paths->keys->count; i++){
+        abs_path = abs_paths[i];
+        item = ht_search(clean_paths, abs_path);
+        if (item == NULL){
+            continue;
+        }
+        rel_path = item->value;
+
+        if (stat(abs_path, &st) == -1) {
+            perror("stat");
+            return -1;
+        }
+
+        f = fopen(abs_path, "rb");
+        if (f == NULL){
+            continue;
+        }
+        sha = object_hash(f, "blob", repo);
+        fclose(f);
+
+        entry = malloc(sizeof(GitIndexEntry));
+
+        entry->ctime_sec= (uint32_t)st.st_ctime;
+        entry->ctime_nsec = (uint32_t)(st.st_ctim.tv_nsec);
+        entry->mtime_sec =  (uint32_t)st.st_mtime;
+        entry->mtime_nsec = (uint32_t)(st.st_mtim.tv_nsec);
+
+        entry->dev = st.st_dev;
+        entry->ino = st.st_ino;
+        //entry->mode_type = (st.st_mode & S_IFMT) >> 12;
+        entry->mode_type = 0b1000;
+        //entry->mode_perms = st.st_mode & 07777;
+        entry->mode_perms = 0644;
+        entry->uid = st.st_uid;
+        entry->gid = st.st_gid;
+        entry->fsize = st.st_size;
+        entry->name = strdup(rel_path);
+        memcpy(entry->sha, sha, sizeof(char) * 41);
+        free(sha);
+        index->entries[old_count + i] = entry;
+    }
+
+    write_index(repo, index);
+    return 0;
+}
+
+int cmd_add(int count, char **paths){
+    GitRepository *repo = repo_find(".", true);
+    if (repo == NULL){
+        fprintf(stderr, "unable to find repo in cmd_add\n");
+        return 1;
+    }
+
+    return add(repo, count, paths, true, false);
 }

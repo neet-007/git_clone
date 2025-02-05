@@ -28,5 +28,6 @@ int cmd_ls_files(bool verbose);
 int cmd_check_ignore(size_t count, char **paths);
 int cmd_status();
 int cmd_rm(int count, char **path);
+int cmd_add(int count, char **paths);
 
 #endif

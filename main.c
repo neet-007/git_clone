@@ -228,11 +228,19 @@ int main(int argc, char *argv[]){
     }
     if (strcmp(argv[1], "rm") == 0){
         if (argc != 3){
-            fprintf(stderr, "usage:git_clone rm PATH\n");
+            fprintf(stderr, "usage:git_clone rm PATHS...\n");
             return 1;
         }
 
         return cmd_rm(argc - 2, argv + 2);
+    }
+    if (strcmp(argv[1], "add") == 0){
+        if (argc != 3){
+            fprintf(stderr, "usage:git_clone add PATHS...\n");
+            return 1;
+        }
+
+        return cmd_add(argc - 2, argv + 2);
     }
 
     return 0;
